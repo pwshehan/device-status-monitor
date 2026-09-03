@@ -41,6 +41,10 @@ func (a *App) evaluate(ctx context.Context, res probe.Result) {
 		snap = &state.Snapshot{Status: model.StatusUnknown}
 		a.snaps[res.DeviceID] = snap
 	}
+	// Recorded before the transition is applied, and for ignored results too:
+	// this is the clock scheduler lag is measured against, and a probe that
+	// was cancelled still means the device was reached for.
+	a.lastCheck[res.DeviceID] = res.At
 	a.mu.Unlock()
 
 	params := state.Params{Reminder: a.reminderInterval(ctx)}
@@ -60,6 +64,7 @@ func (a *App) evaluate(ctx context.Context, res probe.Result) {
 		ErrorMsg:  res.ErrMsg(),
 		CheckedAt: res.At,
 	})
+	a.publishHeartbeat(eff, res, status)
 
 	if tr.OpenIncident {
 		id, err := a.Store.OpenIncident(ctx, res.DeviceID, tr.IncidentStart, res.At, tr.Cause, tr.SendDown)
@@ -80,6 +85,12 @@ func (a *App) evaluate(ctx context.Context, res probe.Result) {
 		}
 		a.log.Info("device recovered",
 			"device", eff.Name, "addr", eff.Addr, "downtime", tr.Downtime.Round(time.Second))
+	}
+
+	// Published after the incident id is known and before the mail is queued,
+	// so a dashboard sees the transition at the same moment the database does.
+	if tr.Changed {
+		a.publishTransition(ctx, eff, res, tr)
 	}
 
 	if err := a.Store.SaveState(ctx, res.DeviceID, *snap, store.LiveResult{

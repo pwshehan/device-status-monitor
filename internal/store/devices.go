@@ -133,7 +133,7 @@ func (s *Store) CreateDevice(ctx context.Context, d model.Device) (model.Device,
 		b2i(d.Enabled), b2i(d.Notify), nts(d.PausedUntil), d.Tags,
 		string(model.StatusUnknown), ts(now), ts(now))
 	if err != nil {
-		return d, err
+		return d, mapErr(err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
@@ -153,7 +153,7 @@ func (s *Store) UpdateDevice(ctx context.Context, d model.Device) (model.Device,
 		nint(d.CheckIntervalSec), nint(d.TimeoutSec), nint(d.FailureThreshold), nint(d.RecoveryThreshold),
 		b2i(d.Enabled), b2i(d.Notify), nts(d.PausedUntil), d.Tags, ts(time.Now()), d.ID)
 	if err != nil {
-		return d, err
+		return d, mapErr(err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return d, ErrNotFound
@@ -235,7 +235,7 @@ func (s *Store) Bulk(ctx context.Context, op BulkOp, ids []int64, groupID *int64
 
 	res, err := tx.ExecContext(ctx, q, args...)
 	if err != nil {
-		return 0, err
+		return 0, mapErr(err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
@@ -249,17 +249,9 @@ func (s *Store) Bulk(ctx context.Context, op BulkOp, ids []int64, groupID *int64
 // Groups and defaults are read once and folded in Go rather than COALESCEd in
 // SQL, so model.Resolve stays the only place the precedence rules live.
 func (s *Store) LoadEffective(ctx context.Context) ([]model.Effective, error) {
-	defaults, err := s.Defaults(ctx)
+	res, err := s.NewResolver(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("load defaults: %w", err)
-	}
-	groups, err := s.ListGroups(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load groups: %w", err)
-	}
-	byID := make(map[int64]*model.Group, len(groups))
-	for i := range groups {
-		byID[groups[i].ID] = &groups[i]
+		return nil, fmt.Errorf("load inheritance tiers: %w", err)
 	}
 	devices, err := s.ListDevices(ctx, DeviceFilter{EnabledOnly: true})
 	if err != nil {
@@ -268,11 +260,7 @@ func (s *Store) LoadEffective(ctx context.Context) ([]model.Effective, error) {
 
 	out := make([]model.Effective, 0, len(devices))
 	for _, d := range devices {
-		var g *model.Group
-		if d.GroupID != nil {
-			g = byID[*d.GroupID]
-		}
-		out = append(out, model.Resolve(d, g, defaults))
+		out = append(out, res.Resolve(d))
 	}
 	return out, nil
 }

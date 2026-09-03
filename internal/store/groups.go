@@ -10,9 +10,6 @@ import (
 	"github.com/gkgraphite/device-status-monitor/internal/model"
 )
 
-// ErrNotFound is returned when a row does not exist.
-var ErrNotFound = errors.New("not found")
-
 const groupCols = `id, name, description, color, sort_order,
 	check_interval_sec, timeout_sec, failure_threshold, recovery_threshold,
 	notify, recipients, paused_until, created_at, updated_at`
@@ -84,7 +81,7 @@ func (s *Store) CreateGroup(ctx context.Context, g model.Group) (model.Group, er
 		nint(g.CheckIntervalSec), nint(g.TimeoutSec), nint(g.FailureThreshold), nint(g.RecoveryThreshold),
 		b2i(g.Notify), nstr(g.Recipients), nts(g.PausedUntil), ts(now), ts(now))
 	if err != nil {
-		return g, err
+		return g, mapErr(err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
@@ -104,7 +101,7 @@ func (s *Store) UpdateGroup(ctx context.Context, g model.Group) (model.Group, er
 		nint(g.CheckIntervalSec), nint(g.TimeoutSec), nint(g.FailureThreshold), nint(g.RecoveryThreshold),
 		b2i(g.Notify), nstr(g.Recipients), nts(g.PausedUntil), ts(time.Now()), g.ID)
 	if err != nil {
-		return g, err
+		return g, mapErr(err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return g, ErrNotFound

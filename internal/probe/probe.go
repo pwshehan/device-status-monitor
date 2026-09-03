@@ -104,6 +104,11 @@ func classify(parent context.Context, err error) Class {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return ClassTimeout
 	}
+	// Winsock's error numbers before the POSIX ones: on Windows the two sets
+	// do not overlap, and Windows is what this ships on.
+	if class, ok := platformClass(err); ok {
+		return class
+	}
 	if errors.Is(err, syscall.ECONNREFUSED) {
 		return ClassRefused
 	}

@@ -496,7 +496,8 @@ work, deferred to a follow-up.
 | GET | `/api/devices/{id}/uptime?days=90` | daily rollups + today's partial |
 | GET | `/api/devices/{id}/incidents?limit=50` | outage log |
 | POST | `/api/devices/bulk` | `{ids, op: "move"\|"pause"\|"resume"\|"delete", group_id?, minutes?}` — one transaction, one reload. This is what makes grouping usable after adding 40 devices |
-| GET | `/api/groups` | list with member counts, up/down/paused tallies, today's aggregate uptime |
+| GET | `/api/groups` | list with member counts, up/down/paused tallies, today's aggregate uptime; ends with an `id: null` **Ungrouped** bucket when one is non-empty |
+| GET | `/api/groups/{id}` | one group with the same tallies — the group-detail screen's header |
 | POST | `/api/groups` | create |
 | PATCH | `/api/groups/{id}` | rename, recolour, change defaults or recipients — reloads every member |
 | DELETE | `/api/groups/{id}` | **devices survive** and become ungrouped (`ON DELETE SET NULL`). Never cascade to devices; the response says how many were orphaned |
@@ -506,7 +507,7 @@ work, deferred to a follow-up.
 | GET | `/api/settings` | secrets redacted to `"***"` / `has_password: true` |
 | PUT | `/api/settings` | write-through; empty password field = leave unchanged |
 | POST | `/api/settings/test-email` | sends immediately, bypasses the outbox, returns the SMTP error verbatim |
-| GET | `/api/events` | SSE stream: `device_status`, `group_status`, `heartbeat`, `incident`, `settings` |
+| GET | `/api/events` | SSE stream: `device_status`, `group_status`, `heartbeat`, `incident`, `settings`. Filter with `?types=`. Bearer header only, so the client is `fetch()`, not `EventSource` |
 
 Conventions: JSON only, `application/problem+json`-shaped errors
 (`{error: {code, message, field}}`), `409` on duplicate device, `422` on validation,
@@ -767,7 +768,7 @@ Each phase ends on something demonstrable. Estimates are focused dev-days.
 |---|---|---|---|---|
 | 0 | ✅ Scaffolding | repo, module, `Makefile`, CI skeleton, `appdir`, `logx`, `store` open + migrations | `go test ./...` green on macOS; `GOOS=windows go build` produces an exe | 0.5 |
 | 1 | ✅ Engine core | `probe`, `scheduler`, `state`, `incidents`, batched writer, **effective-value resolution**, `notify` + outbox | `-dev` mode on macOS monitors 3 real endpoints in 2 groups, logs heartbeats, emails DOWN and RECOVERY with correct downtime; a group interval change reloads only its members | 3.25 |
-| 2 | API | `net/http` handlers, auth + origin middleware, SSE hub, `health`, `summary`, **group + bulk endpoints** | `curl` drives the full CRUD including group create/move/pause/delete; SSE prints a transition live; API tests green | 2.5 |
+| 2 | ✅ API | `net/http` handlers, auth + origin middleware, SSE hub, `health`, `summary`, **group + bulk endpoints** | `curl` drives the full CRUD including group create/move/pause/delete; SSE prints a transition live; API tests green | 2.5 |
 | 3a | UI (browser) | Vite/React/Tailwind, grouped + flat dashboard, group manager, bulk move, device modal with inheritance placeholders, detail + uPlot + uptime strip, settings | Full UI working in Chrome on macOS against `-dev` | 3.75 |
 | 3b | Tauri shell | install `rustup`, Tauri v2 init, tray, single-instance, autostart, CSP, service-down banner | `npm run tauri dev` runs the same UI natively | 1 |
 | 4 | Rollups & hardening | janitor, retention, DPAPI secrets, rate limit + **group-scoped digest**, restart recovery, graceful shutdown | 7-day soak with 50 fake devices across 6 groups: flat memory, DB bounded, no lost heartbeats across restarts, a simulated site outage produces one digest | 1.75 |
@@ -804,14 +805,35 @@ the end of Phase 2 and 3a can run in parallel with 4.
 
 ## 14a. Deviations taken during the build
 
-Two places where the implementation departs from this plan, both deliberate:
+Places where the implementation departs from this plan, all deliberate:
 
 | Plan said | Built as | Why |
 |---|---|---|
+| `core.Start` starts the API (§10), and the layout puts handlers in `internal/api` | Same, but the dependency points **api ← core**: `api.Engine` is an interface (`Reload`, `CheckNow`, `Uptime`, `Running`, `SchedulerLagMS`, `SendTestEmail`, `SaveSMTPPassword`) that `*core.App` satisfies | The alternative is an import cycle. It also means the handlers test against a stub with no scheduler, database writer or clock — the API tests are fast and deterministic because of it |
+| Host pinned to `127.0.0.1:49215` exactly | Host pinned by **hostname** (`127.0.0.1`, `localhost`, `::1`), any port | The rebinding attack turns on the hostname — an attacker's page arrives carrying their DNS name. The port is configurable (`-api-addr`) and is whatever the OS handed out under `httptest`, so pinning it would only break the tests, not an attacker |
+| Bearer token in the `Authorization` header | Same, with no query-parameter fallback | Which rules out the browser `EventSource` API for `/api/events`, since it cannot set headers — the UI reads the stream with `fetch()`. A token in a URL ends up in logs and history, and that is worse than one extra line of client code |
+| `heartbeats?max_points` returns decimated raw rows | Returns **buckets**: `{t, avg_latency_ms, max_latency_ms, checks, downs}`, decimated by SQLite | A 90-day window at 10 s is 777 000 rows for a chart that asked for a thousand points, so the thinning has to happen in SQL. Carrying max and a down count per bucket is what keeps a single 900 ms spike or a two-minute outage from being averaged into invisibility |
+| Uptime endpoints read `rollups_daily` | Read rollups **and** fill any day the janitor has not aggregated from raw heartbeats, tagging each day `source: rollup \| raw \| mixed` | The janitor is Phase 4, so without this every uptime strip is empty until then and Phase 3a has nothing to build against. `source` is what stops the UI reading a raw day as an authoritative one — and once rollups exist they win, so the endpoint does not change shape |
+| Explicit DACL on `api.token` (`SYSTEM` + `Administrators` full, `Users` read) | Written `0600`, which on Windows means it inherits the `ProgramData` ACL — the same effective grants | Setting a DACL explicitly needs a Windows host to verify on, which is Phase 5. Noted as a compromise in `internal/api/token.go`, not silently skipped |
+| — | `store.ErrDuplicate` / `ErrConstraint`, classified by matching SQLite's constraint message text | The alternative is importing the driver's error type into the store's public error contract. A duplicate device is the user's mistake — a 409, not a 500 — and something has to make that call |
 | `scheduler/effective.go` owns the resolution chain | `model/effective.go` (`model.Resolve`) | `state` and `notify` both need the resolved values; putting the type in `scheduler` would have made the state machine import the scheduler, which is backwards. `model` has no dependencies, so nothing gains one |
-| DPAPI secret sealing in Phase 4 | Built in Phase 1 (`internal/secret`) | The notifier needs the SMTP password to send anything, and there is no acceptable interim state where that password sits in the database as plaintext. Windows uses DPAPI at machine scope; elsewhere AES-GCM under a 0600 key file, so the dev loop is not plaintext either. **The DPAPI path cross-compiles but has not been executed on Windows yet** — first real exercise is Phase 5 |
+| DPAPI secret sealing in Phase 4 | Built in Phase 1 (`internal/secret`) | The notifier needs the SMTP password to send anything, and there is no acceptable interim state where that password sits in the database as plaintext. Windows uses DPAPI at machine scope; elsewhere AES-GCM under a 0600 key file, so the dev loop is not plaintext either. **Exercised on Windows in Phase 2**: `PUT /api/settings` with a password stores `smtp.password_enc = dpapi:AQAAANCMnd8…` and `POST /api/settings/test-email` unseals it and reaches the SMTP dial, so both directions now have a real run behind them (still unverified under `LocalSystem`, which is Phase 5) |
 
-One bug the tests caught, worth recording because the shape of it will recur:
+**A Phase 1 bug the first Windows run caught.** `probe.classify` matched
+`syscall.ECONNREFUSED`, and Winsock does not reuse the POSIX errno numbers — so
+on Windows, the only platform this ships on, *every refused connection was
+classified `OTHER`*. The dashboard badge and the alert subject would have read
+"OTHER" where they should read "REFUSED", losing precisely the distinction §4
+says the classification exists to draw: a silent host is a different problem
+from a host that answered "no". Fixed with `platformClass` in
+`probe/classify_windows.go` (Winsock numbers from `golang.org/x/sys/windows`)
+and a no-op `classify_other.go` elsewhere. CI runs on Linux, where the POSIX
+branch is correct and `TestProbeRefused` passes, so nothing caught it until the
+suite ran on Windows. The lesson for Phase 5: **CI green on Linux is not
+evidence about the target platform**, and the acceptance checklist in §12 needs
+to be run, not assumed.
+
+One bug the earlier tests caught, worth recording because the shape of it will recur:
 `state.Apply` clears the snapshot's open-incident id as part of recovering, so
 the evaluator had nothing left to close the incident with — outages resolved in
 memory but stayed open in the database. Fixed by carrying `IncidentID` on the

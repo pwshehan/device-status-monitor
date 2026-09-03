@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gkgraphite/device-status-monitor/internal/api"
 	"github.com/gkgraphite/device-status-monitor/internal/appdir"
 	"github.com/gkgraphite/device-status-monitor/internal/core"
 	"github.com/gkgraphite/device-status-monitor/internal/logx"
@@ -28,12 +29,14 @@ Usage:
   monitor-service uninstall            stop and remove the Windows service
   monitor-service start | stop         control the installed service
   monitor-service status               report the service state
+  monitor-service rotate-token         issue a new local API token
   monitor-service version              print the version
 
 Flags:
   -dev            run in the foreground against ./.dev-data
   -seed           create example groups and devices if the database is empty
   -log-level      debug | info | warn | error (default info)
+  -api-addr       loopback address for the local API (default 127.0.0.1:49215)
 `
 
 func main() {
@@ -47,6 +50,8 @@ func run() error {
 	dev := flag.Bool("dev", false, "run in the foreground against ./.dev-data")
 	seed := flag.Bool("seed", false, "create example groups and devices if the database is empty")
 	level := flag.String("log-level", "info", "debug | info | warn | error")
+	apiAddr := flag.String("api-addr", api.DefaultAddr,
+		"loopback address for the local API; empty disables it")
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 	flag.Parse()
 
@@ -93,6 +98,22 @@ func run() error {
 		}
 		fmt.Println(st)
 		return nil
+	case "rotate-token":
+		dirs, err := appdir.Resolve(*dev)
+		if err != nil {
+			return fmt.Errorf("resolve data directory: %w", err)
+		}
+		if err := dirs.Ensure(); err != nil {
+			return err
+		}
+		if _, err := api.RotateToken(dirs.TokenFile()); err != nil {
+			return err
+		}
+		// The token itself is not printed: it would land in shell history and
+		// in whatever captured the installer's output. The GUI reads the file.
+		fmt.Println("new API token written to", dirs.TokenFile())
+		fmt.Println("restart the service for it to take effect")
+		return nil
 	default:
 		flag.Usage()
 		return fmt.Errorf("unknown command %q", cmd)
@@ -130,7 +151,7 @@ func run() error {
 		}
 	}
 
-	opts := core.Options{Dirs: dirs, Log: log}
+	opts := core.Options{Dirs: dirs, Log: log, Version: version, APIAddr: *apiAddr}
 	if asService {
 		return svcrun.RunService(opts)
 	}

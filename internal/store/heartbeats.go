@@ -103,3 +103,73 @@ func (s *Store) Uptime24h(ctx context.Context, deviceID int64) (*float64, error)
 	}
 	return &up.Float64, nil
 }
+
+// DefaultMaxPoints is how many points a series returns when the caller does
+// not say.
+const DefaultMaxPoints = 1000
+
+// MaxSeriesPoints caps it. Past a couple of thousand points a latency chart is
+// drawing several samples per pixel.
+const MaxSeriesPoints = 5000
+
+// Sample is one bucket of a decimated latency series.
+//
+// Four numbers per bucket rather than one, because a mean alone hides exactly
+// what the chart is for: MaxLatencyMS keeps a single 900 ms spike visible
+// inside a bucket of otherwise 4 ms probes, and Downs keeps a brief outage
+// from being averaged away.
+type Sample struct {
+	At           time.Time
+	AvgLatencyMS *float64
+	MaxLatencyMS int64
+	Checks       int64
+	Downs        int64
+}
+
+// HeartbeatSeries returns at most maxPoints buckets covering [from, to].
+//
+// Decimation is done by SQLite, not by reading everything and thinning it in
+// Go: a 90-day window at a 10 s interval is 777 000 rows, and the caller asked
+// for a thousand points. Bucketing on (checked_at - from) / width keeps the
+// bucket boundaries aligned to the requested window rather than to the epoch,
+// so panning the chart does not reshuffle which samples land together.
+func (s *Store) HeartbeatSeries(ctx context.Context, deviceID int64, from, to time.Time, maxPoints int) ([]Sample, error) {
+	if maxPoints <= 0 {
+		maxPoints = DefaultMaxPoints
+	}
+	if maxPoints > MaxSeriesPoints {
+		maxPoints = MaxSeriesPoints
+	}
+	width := int64(to.Sub(from).Seconds()) / int64(maxPoints)
+	if width < 1 {
+		width = 1
+	}
+
+	var out []Sample
+	err := s.eachRow(ctx, `
+		SELECT MIN(checked_at),
+		       AVG(CASE WHEN status = 'UP' THEN latency_ms END),
+		       MAX(latency_ms),
+		       COUNT(*),
+		       COALESCE(SUM(status = 'DOWN'), 0)
+		FROM heartbeats
+		WHERE device_id = ? AND checked_at >= ? AND checked_at <= ?
+		GROUP BY (checked_at - ?) / ?
+		ORDER BY 1`,
+		[]any{deviceID, ts(from), ts(to), ts(from), width},
+		func(rows *sql.Rows) error {
+			var at int64
+			var avg sql.NullFloat64
+			var sm Sample
+			if err := rows.Scan(&at, &avg, &sm.MaxLatencyMS, &sm.Checks, &sm.Downs); err != nil {
+				return err
+			}
+			sm.At = toTime(at)
+			if avg.Valid {
+				sm.AvgLatencyMS = &avg.Float64
+			}
+			out = append(out, sm)
+			return nil
+		})
+	return out, err
+}

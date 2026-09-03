@@ -2,14 +2,18 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/gkgraphite/device-status-monitor/internal/api"
 	"github.com/gkgraphite/device-status-monitor/internal/appdir"
 	"github.com/gkgraphite/device-status-monitor/internal/model"
 	"github.com/gkgraphite/device-status-monitor/internal/notify"
@@ -469,5 +473,198 @@ func TestRestartResumesWithoutRealerting(t *testing.T) {
 	}
 	if len(log) != 1 {
 		t.Errorf("incident count = %d, want 1 episode across the restart", len(log))
+	}
+}
+
+// TestEnginePublishesTransitionsToTheHub covers the wiring between the
+// evaluator and the API's event hub: the evaluator is the only goroutine that
+// knows a transition happened, so if it does not publish, no dashboard badge
+// ever moves however healthy the rest of the engine is.
+func TestEnginePublishesTransitionsToTheHub(t *testing.T) {
+	ctx := context.Background()
+	dirs, st := harness(t)
+
+	g, err := st.CreateGroup(ctx, model.Group{Name: "Head Office", Notify: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev, err := st.CreateDevice(ctx, model.Device{
+		Name: "core switch", IPAddress: "10.0.0.1", Port: 22,
+		GroupID: &g.ID, Enabled: true, Notify: true,
+		FailureThreshold: intptr(1), RecoveryThreshold: intptr(1),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = st.Close()
+
+	prober := &flakyProber{}
+	prober.up.Store(true)
+
+	app, err := Start(ctx, Options{
+		Dirs: dirs, Log: quietLog(),
+		Prober: prober, Sender: &capturingSender{},
+		RefreshInterval:  200 * time.Millisecond,
+		FlushInterval:    100 * time.Millisecond,
+		NotifierInterval: 10 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Shutdown(5 * time.Second)
+
+	events, unsubscribe := app.Hub.Subscribe(api.EventDeviceStatus, api.EventIncident,
+		api.EventGroupStatus)
+	defer unsubscribe()
+
+	// Collect until the device has been seen up and then down: one transition
+	// each way, an incident opening, and the group tally that goes with it.
+	var (
+		statuses  []api.DeviceStatusEvent
+		incidents []api.IncidentEvent
+		groups    []api.GroupStatusEvent
+	)
+	deadline := time.After(15 * time.Second)
+	flipped := false
+
+	for {
+		select {
+		case <-deadline:
+			t.Fatalf("timed out; statuses=%+v incidents=%+v", statuses, incidents)
+		case ev := <-events:
+			switch data := ev.Data.(type) {
+			case api.DeviceStatusEvent:
+				statuses = append(statuses, data)
+				if data.Status == model.StatusUp && !flipped {
+					flipped = true
+					prober.up.Store(false)
+				}
+			case api.IncidentEvent:
+				incidents = append(incidents, data)
+			case api.GroupStatusEvent:
+				groups = append(groups, data)
+			}
+		}
+		if len(statuses) >= 2 && len(incidents) >= 1 {
+			break
+		}
+	}
+
+	first, second := statuses[0], statuses[1]
+	if first.DeviceID != dev.ID || first.Status != model.StatusUp ||
+		first.PreviousStatus != model.StatusUnknown {
+		t.Errorf("first event = %+v, want UNKNOWN -> UP for device %d", first, dev.ID)
+	}
+	if second.Status != model.StatusDown || second.PreviousStatus != model.StatusUp {
+		t.Errorf("second event = %+v, want UP -> DOWN", second)
+	}
+	if second.Error == "" || second.GroupName != "Head Office" {
+		t.Errorf("DOWN event should carry the dial error and the group: %+v", second)
+	}
+
+	inc := incidents[0]
+	if inc.State != "opened" || inc.ID == 0 || inc.DeviceName != "core switch" {
+		t.Errorf("incident event = %+v, want an opened incident with its id", inc)
+	}
+	// The id has to be on the event: without it the UI cannot tie the
+	// incident to the transition that produced it.
+	if second.IncidentID == nil || *second.IncidentID != inc.ID {
+		t.Errorf("device_status incident_id = %v, want %d", second.IncidentID, inc.ID)
+	}
+	if len(groups) == 0 {
+		t.Error("no group_status event: section headers would never update")
+	}
+
+	// Nothing is overdue in a run this short, and a device probed on time must
+	// not report lag.
+	if lag := app.SchedulerLagMS(); lag > 5000 {
+		t.Errorf("scheduler lag = %dms, want a small figure for an on-time device", lag)
+	}
+}
+
+// TestEngineServesTheAPI covers the wiring core owns rather than the handlers
+// themselves: generating the token file, binding the listener, authenticating
+// with the token it just wrote, and closing the listener on shutdown.
+//
+// Every other API test drives the handler through httptest with a stub engine,
+// which never exercises any of that.
+func TestEngineServesTheAPI(t *testing.T) {
+	ctx := context.Background()
+	dirs, st := harness(t)
+	if _, err := st.CreateDevice(ctx, model.Device{
+		Name: "switch", IPAddress: "10.0.0.1", Port: 22, Enabled: true, Notify: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_ = st.Close()
+
+	prober := &flakyProber{}
+	prober.up.Store(true)
+
+	app, err := Start(ctx, Options{
+		Dirs: dirs, Log: quietLog(), Version: "test",
+		// Port 0: the OS picks one, so a developer's running service does not
+		// make the test suite fail.
+		APIAddr: "127.0.0.1:0",
+		Prober:  prober, Sender: &capturingSender{},
+		RefreshInterval:  200 * time.Millisecond,
+		FlushInterval:    100 * time.Millisecond,
+		NotifierInterval: 10 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	base := "http://" + app.API.Addr()
+
+	token, err := os.ReadFile(dirs.TokenFile())
+	if err != nil {
+		t.Fatalf("the service did not write a token file: %v", err)
+	}
+	bearer := "Bearer " + strings.TrimSpace(string(token))
+
+	// Health, unauthenticated, is how the GUI tells "not running" from
+	// "token wrong".
+	res, err := http.Get(base + "/api/health")
+	if err != nil {
+		t.Fatalf("GET /api/health: %v", err)
+	}
+	var health struct {
+		OK        bool   `json:"ok"`
+		Version   string `json:"version"`
+		Devices   int    `json:"devices"`
+		Monitored int    `json:"monitored"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&health); err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if !health.OK || health.Version != "test" || health.Devices != 1 {
+		t.Errorf("health = %+v, want the real engine's figures", health)
+	}
+
+	// An authenticated route with the token the service generated.
+	req, err := http.NewRequest(http.MethodGet, base+"/api/devices", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", bearer)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /api/devices: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/devices = %d, want 200 with the generated token", res.StatusCode)
+	}
+
+	if err := app.Shutdown(5 * time.Second); err != nil {
+		t.Fatalf("shutdown: %v", err)
+	}
+	// The listener must be gone, or restarting the service fails with
+	// "address already in use" and the SCM reports a service that will not
+	// start.
+	if _, err := http.Get(base + "/api/health"); err == nil {
+		t.Error("the API still answers after shutdown")
 	}
 }

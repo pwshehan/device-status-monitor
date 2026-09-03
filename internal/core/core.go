@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gkgraphite/device-status-monitor/internal/api"
 	"github.com/gkgraphite/device-status-monitor/internal/appdir"
 	"github.com/gkgraphite/device-status-monitor/internal/model"
 	"github.com/gkgraphite/device-status-monitor/internal/notify"
@@ -24,6 +25,12 @@ type Options struct {
 	Dirs          appdir.Dirs
 	Log           *slog.Logger
 	MaxConcurrent int
+	Version       string
+
+	// APIAddr is the loopback address the local API listens on. Empty means
+	// no API at all, which is how the engine tests run: they exercise the
+	// monitoring loop and have no business binding a port.
+	APIAddr string
 
 	// RefreshInterval is how often the effective set is recomputed from the
 	// database. A device or group edit reloads immediately; this loop is what
@@ -71,6 +78,8 @@ type App struct {
 	Store     *store.Store
 	Scheduler *scheduler.Scheduler
 	Notifier  *notify.Worker
+	API       *api.Server
+	Hub       *api.Hub
 
 	opts      Options
 	log       *slog.Logger
@@ -82,9 +91,10 @@ type App struct {
 	cancel  context.CancelFunc
 	started time.Time
 
-	mu    sync.Mutex
-	snaps map[int64]*state.Snapshot
-	effs  map[int64]model.Effective
+	mu        sync.Mutex
+	snaps     map[int64]*state.Snapshot
+	effs      map[int64]model.Effective
+	lastCheck map[int64]time.Time
 }
 
 // Start opens the database, runs migrations and launches every goroutine.
@@ -129,6 +139,8 @@ func Start(parent context.Context, o Options) (*App, error) {
 		started:   time.Now(),
 		snaps:     snaps,
 		effs:      map[int64]model.Effective{},
+		lastCheck: map[int64]time.Time{},
+		Hub:       api.NewHub(),
 	}
 	a.Scheduler = scheduler.New(o.Prober, a.results, o.MaxConcurrent, o.Log)
 	a.Notifier = &notify.Worker{
@@ -145,6 +157,14 @@ func Start(parent context.Context, o Options) (*App, error) {
 		return nil, fmt.Errorf("load devices: %w", err)
 	}
 
+	if o.APIAddr != "" {
+		if err := a.startAPI(ctx, o); err != nil {
+			cancel()
+			_ = st.Close()
+			return nil, err
+		}
+	}
+
 	a.spawn(func() { a.runEvaluator(ctx) })
 	a.spawn(func() { a.runWriter(ctx) })
 	a.spawn(func() { a.runRefresh(ctx) })
@@ -153,6 +173,30 @@ func Start(parent context.Context, o Options) (*App, error) {
 	o.Log.Info("engine started",
 		"db", o.Dirs.DB(), "devices", a.Scheduler.Running(), "dev", o.Dirs.Dev)
 	return a, nil
+}
+
+// startAPI generates or reads the bearer token and binds the listener.
+//
+// A failure here fails the whole start: a monitor with no control channel is a
+// service the GUI reports as down, and pretending otherwise would leave the
+// SCM claiming a healthy service nobody can reach.
+func (a *App) startAPI(ctx context.Context, o Options) error {
+	token, err := api.LoadOrCreateToken(o.Dirs.TokenFile())
+	if err != nil {
+		return fmt.Errorf("prepare api token: %w", err)
+	}
+	a.API = api.New(a.Store, a, a.Hub, api.Config{
+		Addr:    o.APIAddr,
+		Token:   token,
+		Version: o.Version,
+		DataDir: o.Dirs.Root,
+		LogDir:  o.Dirs.LogDir(),
+	}, o.Log)
+
+	if err := a.API.Start(ctx); err != nil {
+		return fmt.Errorf("start api on %s: %w", o.APIAddr, err)
+	}
+	return nil
 }
 
 func (a *App) spawn(fn func()) {
@@ -181,7 +225,16 @@ func (a *App) Uptime() time.Duration { return time.Since(a.started) }
 // The flush matters: without it the last batch of heartbeats, and possibly a
 // state change, are lost on every service stop.
 func (a *App) Shutdown(timeout time.Duration) error {
+	// Cancel first, then stop the listener: the run context is the API's base
+	// context, so cancelling it closes the SSE streams instead of making
+	// Shutdown wait out its timeout on connections that never end.
 	a.cancel()
+
+	if a.API != nil {
+		if err := a.API.Shutdown(5 * time.Second); err != nil {
+			a.log.Warn("api shutdown", "err", err)
+		}
+	}
 
 	done := make(chan struct{})
 	go func() {
@@ -264,6 +317,20 @@ func (a *App) refresh(ctx context.Context) error {
 		a.effs[e.DeviceID] = e
 		if _, ok := a.snaps[e.DeviceID]; !ok {
 			a.snaps[e.DeviceID] = &state.Snapshot{Status: model.StatusUnknown}
+		}
+	}
+	// Forget the last-check time of devices that have dropped out of the
+	// effective set, so a long-running service does not accumulate one entry
+	// per deleted device.
+	//
+	// Snapshots are deliberately *not* pruned here: a disabled device leaves
+	// the effective set too, and dropping its snapshot would lose the id of an
+	// incident that is still open in the database — re-enabling the device
+	// would then never close it. A stale snapshot costs a few bytes until the
+	// next restart; a lost incident id costs an outage that never resolves.
+	for id := range a.lastCheck {
+		if _, live := a.effs[id]; !live {
+			delete(a.lastCheck, id)
 		}
 	}
 	a.mu.Unlock()
