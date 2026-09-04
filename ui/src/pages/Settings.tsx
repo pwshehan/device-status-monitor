@@ -14,6 +14,8 @@ interface Form {
   from: string
   recipients: string
   reminder: string
+  collapse: string
+  maxPerHour: string
   interval: string
   timeout: string
   failure: string
@@ -35,6 +37,8 @@ function formOf(s: ApiSettings): Form {
     from: s.smtp.from,
     recipients: s.alerts.recipients,
     reminder: String(s.alerts.reminder_sec),
+    collapse: String(s.alerts.collapse_sec),
+    maxPerHour: String(s.alerts.max_per_hour),
     interval: String(s.defaults.check_interval_sec),
     timeout: String(s.defaults.timeout_sec),
     failure: String(s.defaults.failure_threshold),
@@ -100,7 +104,12 @@ function SettingsForm({ settings: stored, onDiscard }: FormProps) {
           // keep the stored password" work.
           ...(form.password === '' ? {} : { password: form.password }),
         },
-        alerts: { recipients: form.recipients, reminder_sec: Number(form.reminder) },
+        alerts: {
+          recipients: form.recipients,
+          reminder_sec: Number(form.reminder),
+          collapse_sec: Number(form.collapse),
+          max_per_hour: Number(form.maxPerHour),
+        },
         defaults: {
           check_interval_sec: Number(form.interval),
           timeout_sec: Number(form.timeout),
@@ -260,6 +269,48 @@ function SettingsForm({ settings: stored, onDiscard }: FormProps) {
             />
           )}
         </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Group failures together for (seconds)"
+            error={errorFor('alerts.collapse_sec')}
+            hint={
+              form.collapse === '0'
+                ? 'Off: every device sends its own message, immediately.'
+                : `A site failing together becomes one message. Costs ${form.collapse}s of delay on every alert.`
+            }
+          >
+            {(id) => (
+              <input
+                id={id}
+                className={inputClass}
+                value={form.collapse}
+                inputMode="numeric"
+                onChange={(e) => set('collapse', e.target.value)}
+              />
+            )}
+          </Field>
+
+          <Field
+            label="Maximum emails per hour"
+            error={errorFor('alerts.max_per_hour')}
+            hint={
+              form.maxPerHour === '0'
+                ? 'No cap.'
+                : 'At the cap, one message says mail is paused. Incidents are still recorded.'
+            }
+          >
+            {(id) => (
+              <input
+                id={id}
+                className={inputClass}
+                value={form.maxPerHour}
+                inputMode="numeric"
+                onChange={(e) => set('maxPerHour', e.target.value)}
+              />
+            )}
+          </Field>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => test.mutate(undefined)} disabled={test.isPending}>

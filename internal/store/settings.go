@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/gkgraphite/device-status-monitor/internal/model"
 )
@@ -23,6 +24,13 @@ const (
 	KeyAlertRecipients  = "alert.recipients"
 	KeyAlertReminderSec = "alert.reminder_sec"
 
+	// How long an alert waits for company before going out, and the ceiling on
+	// outbound mail per hour. Both are settings rather than constants because
+	// the right answer depends on how many devices there are and how much mail
+	// the operator will tolerate.
+	KeyAlertCollapseSec = "alert.collapse_sec"
+	KeyAlertMaxPerHour  = "alert.max_per_hour"
+
 	KeyDefaultInterval          = "default.check_interval_sec"
 	KeyDefaultTimeout           = "default.timeout_sec"
 	KeyDefaultFailureThreshold  = "default.failure_threshold"
@@ -37,6 +45,8 @@ var seedDefaults = map[string]string{
 	KeySMTPPort:                 "587",
 	KeySMTPSecurity:             "starttls",
 	KeyAlertReminderSec:         "0",
+	KeyAlertCollapseSec:         "15",
+	KeyAlertMaxPerHour:          "20",
 	KeyDefaultInterval:          "30",
 	KeyDefaultTimeout:           "3",
 	KeyDefaultFailureThreshold:  "3",
@@ -134,6 +144,73 @@ func atoiOr(s string, fallback int) int {
 	}
 	n, err := strconv.Atoi(s)
 	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
+}
+
+// Retention is how long each kind of history is kept.
+type Retention struct {
+	RawDays    int
+	RollupDays int
+}
+
+// Retention reads the two retention windows, falling back to the built-in
+// defaults on a malformed value — a typo in one setting must not stop the
+// janitor, or the database grows without bound while somebody investigates.
+func (s *Store) Retention(ctx context.Context) (Retention, error) {
+	all, err := s.AllSettings(ctx)
+	if err != nil {
+		return Retention{RawDays: 14, RollupDays: 400}, err
+	}
+	return Retention{
+		RawDays:    atoiOr(all[KeyRetentionRawDays], 14),
+		RollupDays: atoiOr(all[KeyRetentionRollupDays], 400),
+	}, nil
+}
+
+// AlertPolicy is the collapse and rate-limit configuration.
+type AlertPolicy struct {
+	// CollapseWindow is how long an alert waits for company before going out.
+	// Zero disables collapsing entirely, and every device alerts on its own.
+	CollapseWindow time.Duration
+
+	// MaxPerHour caps outbound mail. Zero means no cap.
+	MaxPerHour int
+}
+
+// AlertPolicy reads the collapse window and the hourly mail cap.
+func (s *Store) AlertPolicy(ctx context.Context) (AlertPolicy, error) {
+	all, err := s.AllSettings(ctx)
+	if err != nil {
+		return AlertPolicy{CollapseWindow: 15 * time.Second, MaxPerHour: 20}, err
+	}
+	return AlertPolicy{
+		CollapseWindow: time.Duration(atoiOrZero(all[KeyAlertCollapseSec], 15)) * time.Second,
+		MaxPerHour:     atoiOrZero(all[KeyAlertMaxPerHour], 20),
+	}, nil
+}
+
+// AlertsSentSince counts mail queued in a window, for the rate limit.
+//
+// Counted from the outbox rather than an in-memory tally so a restart cannot
+// be used — accidentally — to reset the budget and let a flapping device send
+// another twenty mails.
+func (s *Store) AlertsSentSince(ctx context.Context, since time.Time) (int64, error) {
+	var n int64
+	err := s.r.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM alert_outbox WHERE created_at >= ?`, ts(since)).Scan(&n)
+	return n, err
+}
+
+// atoiOrZero is atoiOr but accepts 0 as a meaningful value: for a collapse
+// window or a mail cap, zero means "off" rather than "use the default".
+func atoiOrZero(s string, fallback int) int {
+	if s == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
 		return fallback
 	}
 	return n

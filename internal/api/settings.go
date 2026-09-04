@@ -31,6 +31,8 @@ type settingsResponse struct {
 	Alerts struct {
 		Recipients  string `json:"recipients"`
 		ReminderSec int    `json:"reminder_sec"`
+		CollapseSec int    `json:"collapse_sec"`
+		MaxPerHour  int    `json:"max_per_hour"`
 	} `json:"alerts"`
 
 	Defaults struct {
@@ -69,6 +71,8 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 
 	res.Alerts.Recipients = all[store.KeyAlertRecipients]
 	res.Alerts.ReminderSec = atoiOr(all[store.KeyAlertReminderSec], 0)
+	res.Alerts.CollapseSec = atoiOr(all[store.KeyAlertCollapseSec], 15)
+	res.Alerts.MaxPerHour = atoiOr(all[store.KeyAlertMaxPerHour], 20)
 
 	res.Defaults.CheckIntervalSec = atoiOr(all[store.KeyDefaultInterval], 30)
 	res.Defaults.TimeoutSec = atoiOr(all[store.KeyDefaultTimeout], 3)
@@ -96,6 +100,8 @@ type settingsBody struct {
 	Alerts struct {
 		Recipients  Opt[string] `json:"recipients"`
 		ReminderSec Opt[int]    `json:"reminder_sec"`
+		CollapseSec Opt[int]    `json:"collapse_sec"`
+		MaxPerHour  Opt[int]    `json:"max_per_hour"`
 	} `json:"alerts"`
 
 	Defaults struct {
@@ -135,6 +141,8 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	putInt(store.KeySMTPPort, body.SMTP.Port)
 	putStr(store.KeyAlertRecipients, body.Alerts.Recipients)
 	putInt(store.KeyAlertReminderSec, body.Alerts.ReminderSec)
+	putInt(store.KeyAlertCollapseSec, body.Alerts.CollapseSec)
+	putInt(store.KeyAlertMaxPerHour, body.Alerts.MaxPerHour)
 	putInt(store.KeyDefaultInterval, body.Defaults.CheckIntervalSec)
 	putInt(store.KeyDefaultTimeout, body.Defaults.TimeoutSec)
 	putInt(store.KeyDefaultFailureThreshold, body.Defaults.FailureThreshold)
@@ -214,6 +222,10 @@ func validateSettings(kv map[string]string) error {
 	rules := []rule{
 		{store.KeySMTPPort, "smtp.port", 1, 65535},
 		{store.KeyAlertReminderSec, "alerts.reminder_sec", 0, 60 * 60 * 24 * 7},
+		// Zero is valid for both: no collapsing, and no cap. The upper bound on
+		// the window is the ceiling the buffer enforces anyway (core.MaxHold).
+		{store.KeyAlertCollapseSec, "alerts.collapse_sec", 0, 120},
+		{store.KeyAlertMaxPerHour, "alerts.max_per_hour", 0, 1000},
 		{store.KeyDefaultInterval, "defaults.check_interval_sec", MinIntervalSec, 60 * 60 * 24},
 		{store.KeyDefaultTimeout, "defaults.timeout_sec", MinTimeoutSec, MaxTimeoutSec},
 		{store.KeyDefaultFailureThreshold, "defaults.failure_threshold", 1, 100},

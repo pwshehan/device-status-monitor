@@ -18,12 +18,25 @@ import (
 // decision happens here, in order, so there are no locks around device state
 // and no way for two probes of the same device to race each other.
 func (a *App) runEvaluator(ctx context.Context) {
+	// The collapse buffer is flushed from this loop rather than its own
+	// goroutine, so the buffer needs no lock and a flush can never interleave
+	// with a transition being applied.
+	flush := time.NewTicker(2 * time.Second)
+	defer flush.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
+			// Anything still waiting for company goes out now: a pending
+			// alert lost to a restart is an outage nobody was told about.
+			flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			a.flushAlerts(flushCtx, time.Now(), true)
+			cancel()
 			return
 		case res := <-a.results:
 			a.evaluate(ctx, res)
+		case <-flush.C:
+			a.flushAlerts(ctx, time.Now(), false)
 		}
 	}
 }
@@ -140,9 +153,17 @@ func (a *App) dispatch(ctx context.Context, eff model.Effective, res probe.Resul
 
 	switch {
 	case tr.SendDown:
-		subject, text, htmlBody := notify.DownAlert(ev)
-		a.queue(ctx, model.AlertDown, incidentID, eff, subject, text, htmlBody)
+		// Parked rather than sent: if two more devices in this group fail
+		// within the collapse window, all three become one mail. See
+		// digest.go for why that matters more than the seconds it costs.
+		a.queueAlert(ctx, pendingAlert{
+			eff: eff, kind: model.AlertDown, event: ev,
+			incidentID: incidentID, queuedAt: time.Now(),
+		})
 		if incidentID != nil {
+			// Marked as alerted at the moment the decision is made, not when
+			// the mail goes out: this is what stops a restart mid-collapse
+			// from alerting a second time for the same outage.
 			if err := a.Store.MarkIncidentAlerted(ctx, *incidentID, time.Now()); err != nil {
 				a.log.Error("mark incident alerted", "incident", *incidentID, "err", err)
 			}
@@ -154,27 +175,88 @@ func (a *App) dispatch(ctx context.Context, eff model.Effective, res probe.Resul
 		if up, err := a.Store.Uptime24h(ctx, eff.DeviceID); err == nil {
 			ev.Uptime24h = up
 		}
-		subject, text, htmlBody := notify.RecoveryAlert(ev)
-		a.queue(ctx, model.AlertRecovery, incidentID, eff, subject, text, htmlBody)
+		a.queueAlert(ctx, pendingAlert{
+			eff: eff, kind: model.AlertRecovery, event: ev,
+			incidentID: incidentID, queuedAt: time.Now(),
+		})
 
 	case tr.SendReminder:
+		// Reminders never collapse. One is already a summary of a state that
+		// has not changed, and batching them would mean a mail about several
+		// unrelated ongoing outages that nobody asked for.
 		ev.FirstFail = snap.OpenIncidentStart
 		openFor := time.Since(snap.OpenIncidentStart)
 		subject, text, htmlBody := notify.ReminderAlert(ev, openFor)
-		a.queue(ctx, model.AlertDown, incidentID, eff, subject, text, htmlBody)
+		a.send(ctx, model.AlertDown, incidentID, eff.Recipients, subject, text, htmlBody)
 	}
 }
 
-func (a *App) queue(ctx context.Context, kind model.AlertKind, incidentID *int64,
-	eff model.Effective, subject, text, htmlBody string) {
+// send queues one mail, subject to the hourly cap.
+//
+// Every outbound alert goes through here, which is the only way a rate limit
+// can be honest: a limiter that individual and digest paths could each bypass
+// would not be a limit.
+func (a *App) send(ctx context.Context, kind model.AlertKind, incidentID *int64,
+	recipients []string, subject, text, htmlBody string) {
 
-	if _, err := notify.Enqueue(ctx, a.Store, kind, incidentID, eff.Recipients,
-		subject, text, htmlBody); err != nil {
-		a.log.Error("queue alert", "kind", kind, "device", eff.Name, "err", err)
+	if len(recipients) == 0 {
+		a.log.Warn("alert suppressed: no recipients configured", "subject", subject)
 		return
 	}
-	a.log.Info("alert queued", "kind", kind, "device", eff.Name,
-		"recipients", len(eff.Recipients), "routing", eff.Source["recipients"])
+	if !a.allowMail(ctx, recipients) {
+		return
+	}
+
+	if _, err := notify.Enqueue(ctx, a.Store, kind, incidentID, recipients,
+		subject, text, htmlBody); err != nil {
+		a.log.Error("queue alert", "kind", kind, "subject", subject, "err", err)
+		return
+	}
+	a.log.Info("alert queued", "kind", kind, "subject", subject, "recipients", len(recipients))
+}
+
+// allowMail enforces the hourly cap.
+//
+// When the cap is reached, one notice goes out saying so and the rest is
+// withheld. Alerts are never lost by this: the incidents are in the database
+// and on the dashboard either way, and mail that stops without explanation is
+// worse than mail that says it has stopped — silence reads as "all clear".
+func (a *App) allowMail(ctx context.Context, recipients []string) bool {
+	policy := a.alertPolicy(ctx)
+	if policy.MaxPerHour <= 0 {
+		return true
+	}
+
+	window := time.Hour
+	sent, err := a.Store.AlertsSentSince(ctx, time.Now().Add(-window))
+	if err != nil {
+		// Failing open: a database problem must not also silence alerting.
+		if ctx.Err() == nil {
+			a.log.Warn("count recent alerts, allowing mail", "err", err)
+		}
+		return true
+	}
+	if sent < int64(policy.MaxPerHour) {
+		return true
+	}
+
+	// The notice itself is rate limited to once per window, and counts against
+	// nothing — otherwise hitting the cap would generate a mail per attempt.
+	if time.Since(a.throttledAt) < window {
+		a.log.Warn("alert mail withheld: hourly cap reached",
+			"cap", policy.MaxPerHour, "sent", sent)
+		return false
+	}
+	a.throttledAt = time.Now()
+
+	subject, text, htmlBody := notify.Throttled(int(sent), window)
+	if _, err := notify.Enqueue(ctx, a.Store, model.AlertDigest, nil, recipients,
+		subject, text, htmlBody); err != nil {
+		a.log.Error("queue throttle notice", "err", err)
+	}
+	a.log.Error("alert mail paused: hourly cap reached",
+		"cap", policy.MaxPerHour, "sent", sent)
+	return false
 }
 
 // reminderInterval reads alert.reminder_sec. A bad value means "off" rather

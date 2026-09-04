@@ -88,12 +88,16 @@ func harness(t *testing.T) (appdir.Dirs, *store.Store) {
 		t.Fatal(err)
 	}
 	if err := st.PutSettings(ctx, map[string]string{
-		store.KeyDefaultInterval: "1",
-		store.KeySMTPHost:        "127.0.0.1",
-		store.KeySMTPPort:        "2525",
-		store.KeySMTPSecurity:    notify.SecurityNone,
-		store.KeySMTPFrom:        "monitor@example.com",
-		store.KeyAlertRecipients: "ops@example.com",
+		// Collapsing off by default in this harness: these tests are about the
+		// probe-to-mail path, and a 15 s hold would only make each of them 15 s
+		// slower. The digest has its own tests, which set the window they need.
+		store.KeyAlertCollapseSec: "0",
+		store.KeyDefaultInterval:  "1",
+		store.KeySMTPHost:         "127.0.0.1",
+		store.KeySMTPPort:         "2525",
+		store.KeySMTPSecurity:     notify.SecurityNone,
+		store.KeySMTPFrom:         "monitor@example.com",
+		store.KeyAlertRecipients:  "ops@example.com",
 	}); err != nil {
 		t.Fatal(err)
 	}

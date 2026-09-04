@@ -15,6 +15,7 @@ import (
 	"github.com/gkgraphite/device-status-monitor/internal/model"
 	"github.com/gkgraphite/device-status-monitor/internal/notify"
 	"github.com/gkgraphite/device-status-monitor/internal/probe"
+	"github.com/gkgraphite/device-status-monitor/internal/rollup"
 	"github.com/gkgraphite/device-status-monitor/internal/scheduler"
 	"github.com/gkgraphite/device-status-monitor/internal/state"
 	"github.com/gkgraphite/device-status-monitor/internal/store"
@@ -43,6 +44,10 @@ type Options struct {
 
 	// NotifierInterval is how often the outbox is drained.
 	NotifierInterval time.Duration
+
+	// JanitorInterval is how often history is aggregated and pruned. Hourly
+	// in production; tests drive a pass directly instead.
+	JanitorInterval time.Duration
 
 	// Prober and Sender are injectable for tests.
 	Prober probe.Prober
@@ -78,6 +83,7 @@ type App struct {
 	Store     *store.Store
 	Scheduler *scheduler.Scheduler
 	Notifier  *notify.Worker
+	Janitor   *rollup.Janitor
 	API       *api.Server
 	Hub       *api.Hub
 
@@ -95,6 +101,13 @@ type App struct {
 	snaps     map[int64]*state.Snapshot
 	effs      map[int64]model.Effective
 	lastCheck map[int64]time.Time
+
+	// Alert collapsing state. Only ever touched from the evaluator goroutine,
+	// which is why none of it is behind the mutex above.
+	alerts      *alertBuffer
+	policy      store.AlertPolicy
+	policyAt    time.Time
+	throttledAt time.Time
 }
 
 // Start opens the database, runs migrations and launches every goroutine.
@@ -140,6 +153,7 @@ func Start(parent context.Context, o Options) (*App, error) {
 		snaps:     snaps,
 		effs:      map[int64]model.Effective{},
 		lastCheck: map[int64]time.Time{},
+		alerts:    newAlertBuffer(),
 		Hub:       api.NewHub(),
 	}
 	a.Scheduler = scheduler.New(o.Prober, a.results, o.MaxConcurrent, o.Log)
@@ -148,6 +162,11 @@ func Start(parent context.Context, o Options) (*App, error) {
 		Sender:   o.Sender,
 		KeyPath:  filepath.Join(o.Dirs.Root, "secret.key"),
 		Interval: o.NotifierInterval,
+		Log:      o.Log,
+	}
+	a.Janitor = &rollup.Janitor{
+		Store:    st,
+		Interval: o.JanitorInterval,
 		Log:      o.Log,
 	}
 
@@ -169,6 +188,7 @@ func Start(parent context.Context, o Options) (*App, error) {
 	a.spawn(func() { a.runWriter(ctx) })
 	a.spawn(func() { a.runRefresh(ctx) })
 	a.spawn(func() { a.Notifier.Run(ctx) })
+	a.spawn(func() { a.Janitor.Run(ctx) })
 
 	o.Log.Info("engine started",
 		"db", o.Dirs.DB(), "devices", a.Scheduler.Running(), "dev", o.Dirs.Dev)

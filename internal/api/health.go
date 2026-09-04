@@ -30,10 +30,27 @@ type healthResponse struct {
 	OpenIncidents  int64  `json:"open_incidents"`
 	PendingAlerts  int64  `json:"pending_alerts"`
 	SchedulerLagMS int64  `json:"scheduler_lag_ms"`
-	EventClients   int    `json:"event_clients"`
-	EventsDropped  int64  `json:"events_dropped"`
-	DataDir        string `json:"data_dir"`
-	LogDir         string `json:"log_dir"`
+	Heartbeats     int64  `json:"heartbeats"`
+	Rollups        int64  `json:"rollups"`
+
+	// Maintenance is null until the janitor's first pass, which happens at
+	// startup — so a null here after the service has been up for a while means
+	// something is wrong with it.
+	Maintenance   *maintenanceStatus `json:"maintenance"`
+	EventClients  int                `json:"event_clients"`
+	EventsDropped int64              `json:"events_dropped"`
+	DataDir       string             `json:"data_dir"`
+	LogDir        string             `json:"log_dir"`
+}
+
+// maintenanceStatus is what the last janitor pass did.
+type maintenanceStatus struct {
+	At               string `json:"at"`
+	RolledUp         int    `json:"rolled_up"`
+	HeartbeatsPruned int64  `json:"heartbeats_pruned"`
+	RollupsPruned    int64  `json:"rollups_pruned"`
+	Vacuumed         bool   `json:"vacuumed"`
+	Error            string `json:"error,omitempty"`
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +96,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	if n, err := s.st.PendingAlerts(ctx); err == nil {
 		res.PendingAlerts = n
+	}
+	// The two numbers that show retention is working: raw rows should sit at
+	// roughly retention.raw_days worth, and rollups should keep growing.
+	if n, err := s.st.CountHeartbeats(ctx); err == nil {
+		res.Heartbeats = n
+	}
+	if n, err := s.st.CountRollups(ctx); err == nil {
+		res.Rollups = n
+	}
+	if j := s.eng.JanitorStatus(); !j.At.IsZero() {
+		res.Maintenance = &maintenanceStatus{
+			At:               rfc3339(j.At),
+			RolledUp:         j.RolledUp,
+			HeartbeatsPruned: j.HeartbeatsPruned,
+			RollupsPruned:    j.RollupsPruned,
+			Vacuumed:         j.Vacuumed,
+			Error:            j.Err,
+		}
 	}
 
 	writeJSON(w, http.StatusOK, res)

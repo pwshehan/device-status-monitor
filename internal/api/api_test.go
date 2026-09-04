@@ -27,6 +27,7 @@ import (
 type fakeEngine struct {
 	st       *store.Store
 	mu       sync.Mutex
+	janitor  JanitorStatus
 	reloads  int
 	checkRes probe.Result
 	checkOK  bool
@@ -57,6 +58,12 @@ func (f *fakeEngine) CheckNow(context.Context, int64) (probe.Result, bool) {
 func (f *fakeEngine) Uptime() time.Duration { return 42 * time.Second }
 func (f *fakeEngine) Running() int          { return 3 }
 func (f *fakeEngine) SchedulerLagMS() int64 { return 17 }
+
+func (f *fakeEngine) JanitorStatus() JanitorStatus {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.janitor
+}
 
 func (f *fakeEngine) SendTestEmail(_ context.Context, to []string) error {
 	f.mu.Lock()
@@ -1596,5 +1603,73 @@ func TestTauriWebviewOriginIsAllowed(t *testing.T) {
 				t.Errorf("status = %d, want 403", rec.Code)
 			}
 		})
+	}
+}
+
+func TestHealthReportsMaintenance(t *testing.T) {
+	e := newEnv(t)
+
+	// Before the first pass there is nothing to report, and the field is null
+	// rather than a zero timestamp pretending a pass happened.
+	var before healthResponse
+	e.mustCall(http.MethodGet, "/api/health", nil, &before, http.StatusOK)
+	if before.Maintenance != nil {
+		t.Errorf("maintenance = %+v before any pass, want null", before.Maintenance)
+	}
+
+	e.eng.mu.Lock()
+	e.eng.janitor = JanitorStatus{
+		At: time.Now(), RolledUp: 12, HeartbeatsPruned: 40_000, RollupsPruned: 3, Vacuumed: true,
+	}
+	e.eng.mu.Unlock()
+
+	var after healthResponse
+	e.mustCall(http.MethodGet, "/api/health", nil, &after, http.StatusOK)
+	if after.Maintenance == nil {
+		t.Fatal("maintenance = null after a pass")
+	}
+	if after.Maintenance.RolledUp != 12 || after.Maintenance.HeartbeatsPruned != 40_000 {
+		t.Errorf("maintenance = %+v, want the pass's figures", after.Maintenance)
+	}
+	if !after.Maintenance.Vacuumed {
+		t.Error("vacuumed not reported")
+	}
+	// Retention only means something if these two are visible: raw rows should
+	// sit at about the raw window, and rollups should keep accumulating.
+	if after.Heartbeats != 0 || after.Rollups != 0 {
+		t.Errorf("counts = %d heartbeats / %d rollups on an empty database",
+			after.Heartbeats, after.Rollups)
+	}
+}
+
+func TestAlertVolumeSettingsRoundTrip(t *testing.T) {
+	e := newEnv(t)
+
+	var res settingsResponse
+	e.mustCall(http.MethodGet, "/api/settings", nil, &res, http.StatusOK)
+	if res.Alerts.CollapseSec != 15 || res.Alerts.MaxPerHour != 20 {
+		t.Errorf("defaults = %ds collapse / %d per hour, want 15 and 20",
+			res.Alerts.CollapseSec, res.Alerts.MaxPerHour)
+	}
+
+	// Zero is a meaningful value for both — no collapsing, no cap — so it must
+	// survive the round trip rather than being read as "unset, use the default".
+	e.mustCall(http.MethodPut, "/api/settings", map[string]any{
+		"alerts": map[string]any{"collapse_sec": 0, "max_per_hour": 0},
+	}, &res, http.StatusOK)
+	if res.Alerts.CollapseSec != 0 || res.Alerts.MaxPerHour != 0 {
+		t.Errorf("after writing zeros = %d / %d, want both 0",
+			res.Alerts.CollapseSec, res.Alerts.MaxPerHour)
+	}
+
+	// The window is capped at the ceiling the buffer enforces anyway; a larger
+	// value would be silently ignored, which is worse than a 422.
+	var raw json.RawMessage
+	if got := e.call(http.MethodPut, "/api/settings",
+		map[string]any{"alerts": map[string]any{"collapse_sec": 600}}, &raw); got != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422", got)
+	}
+	if field := errorOf(t, raw).Field; field != "alerts.collapse_sec" {
+		t.Errorf("field = %q, want alerts.collapse_sec", field)
 	}
 }

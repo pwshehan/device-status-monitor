@@ -222,13 +222,13 @@ func (s *Store) deviceDays(ctx context.Context, ids []int64, days int) ([]device
 	var raw []deviceDay
 	if err := s.eachRow(ctx, `
 		SELECT h.device_id, d.name,
-		       date(h.checked_at, 'unixepoch', 'localtime') AS day,
+		       date(h.checked_at, 'unixepoch', 'localtime') AS local_day,
 		       COUNT(*), COALESCE(SUM(h.status = 'UP'), 0),
 		       AVG(CASE WHEN h.status = 'UP' THEN h.latency_ms END)
 		FROM heartbeats h
 		JOIN devices d ON d.id = h.device_id
 		WHERE h.device_id IN (`+in+`) AND h.checked_at >= ?
-		GROUP BY h.device_id, day`,
+		GROUP BY h.device_id, date(h.checked_at, 'unixepoch', 'localtime')`,
 		withArgs(idArgs, ts(cutoff)),
 		func(rows *sql.Rows) error {
 			var r deviceDay

@@ -191,6 +191,17 @@ export interface Health {
   open_incidents: number
   pending_alerts: number
   scheduler_lag_ms: number
+  heartbeats: number
+  rollups: number
+  /** Null until the janitor's first pass, which happens at startup. */
+  maintenance: {
+    at: string
+    rolled_up: number
+    heartbeats_pruned: number
+    rollups_pruned: number
+    vacuumed: boolean
+    error?: string
+  } | null
   event_clients: number
   events_dropped: number
   data_dir: string
@@ -211,6 +222,10 @@ export interface Settings {
   alerts: {
     recipients: string
     reminder_sec: number
+    /** How long an alert waits for company before going out. 0 = off. */
+    collapse_sec: number
+    /** Ceiling on outbound mail per hour. 0 = no cap. */
+    max_per_hour: number
   }
   defaults: {
     check_interval_sec: number

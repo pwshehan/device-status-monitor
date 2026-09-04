@@ -16,8 +16,8 @@ See [PLAN.md](PLAN.md) for the full architecture and the phase plan.
 | 2 | Local REST API + SSE | **done** |
 | 3a | UI in the browser | **done** |
 | 3b | Tauri shell | **done** |
-| 4 | Rollups, retention, hardening | next |
-| 5 | Windows service + installer | |
+| 4 | Rollups, retention, hardening | **done** |
+| 5 | Windows service + installer | next |
 | 6 | Acceptance and docs | |
 
 ## Developing on macOS or Linux
@@ -172,6 +172,46 @@ Errors are always `{"error":{"code","message","field"}}`: `409` on a duplicate
 device, `422` on validation with the offending field named, `413` past the
 64 kB body cap.
 
+## History, retention and alert volume
+
+Two hundred devices on a 30-second interval write about 576 000 rows a day, so
+the service aggregates and prunes on an hourly pass:
+
+- A **finished** day becomes one row per device in `rollups_daily`. Today is
+  never aggregated — a half-finished day would be frozen as the whole day's
+  numbers — so today's figures come from raw rows and everything older comes
+  from summaries.
+- **Downtime comes from the incident log**, clipped to each local day, not from
+  counting DOWN rows. Counting rows assumes the interval never changed, loses
+  the gap around a restart, and cannot split an outage that spans midnight.
+- **Raw rows are pruned in 10 000-row chunks** past `retention.raw_days`
+  (default 14). Their summaries survive, so the 90-day strip keeps working.
+  Rollups and resolved incidents age out at `retention.rollup_days` (400) —
+  but an **open** incident is never pruned, whatever its age.
+- The WAL is checkpointed every pass; `VACUUM` only runs when a quarter of the
+  file is free and at most daily, because it blocks everything.
+
+`GET /api/health` reports the last pass, and the Service page shows it. A
+`maintenance: null` after the service has been up a while means retention is
+not running and the database is growing.
+
+Alert volume is bounded in two ways:
+
+- **A site outage is one email.** When three or more devices in one group fail
+  inside the collapse window, they become one message — `[DOWN] Warehouse — 6
+  of 8 devices unreachable`, naming each one. Recovery collapses the same way.
+  Failures spread across unrelated groups collapse into a global digest at ten
+  devices, because that has one cause upstream of all of them. Ungrouped
+  devices never form a group digest.
+- **A cap of `alert.max_per_hour`** (default 20). At the cap one message says
+  mail is paused and the rest is withheld — never dropped silently, because
+  mail that stops without explanation reads as "all clear".
+
+The collapse costs latency: an alert arrives one window later than the state
+change, so ~105 s on the defaults rather than ~90 s. A group whose every member
+has failed flushes at once, and `alert.collapse_sec: 0` restores immediate
+per-device mail.
+
 ## Service commands (Windows only)
 
 ```
@@ -193,6 +233,7 @@ internal/scheduler      one worker per device, bounded concurrency
 internal/state          the state machine — pure, no I/O
 internal/notify         SMTP transports, templates, outbox worker
 internal/secret         DPAPI (Windows) / AES-GCM (elsewhere)
+internal/rollup         the janitor: aggregate, prune, checkpoint, vacuum
 internal/api            HTTP handlers, auth + origin middleware, SSE hub
 internal/core           wiring: evaluator, writer, refresh loop, API
 internal/svcrun         Windows Service vs. foreground

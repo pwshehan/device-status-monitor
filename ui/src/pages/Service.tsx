@@ -4,7 +4,7 @@ import { apiToken, setApiToken } from '../api/client'
 import { useStream } from '../app/StreamContext'
 import { Button, ErrorNote, Field, Spinner, Tile, inputClass } from '../components/ui'
 import { useHealth } from '../hooks/queries'
-import { bytes, duration } from '../lib/format'
+import { bytes, duration, since } from '../lib/format'
 import { isAutostartEnabled, isDesktopShell, setAutostart } from '../lib/shell'
 
 /**
@@ -74,6 +74,43 @@ export function Service() {
               hint={`${h.event_clients} client(s), ${h.events_dropped} event(s) dropped`}
             />
           </div>
+
+          <section className="space-y-2 rounded-lg bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <h2 className="text-sm font-semibold">History and maintenance</h2>
+            <dl className="space-y-1">
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-slate-500 dark:text-slate-400">Stored checks</dt>
+                <dd className="tabular-nums">
+                  {h.heartbeats.toLocaleString()} raw · {h.rollups.toLocaleString()} daily
+                  summaries
+                </dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-slate-500 dark:text-slate-400">Last maintenance</dt>
+                <dd className="text-right">
+                  {h.maintenance === null ? (
+                    // Null after the service has been up a while means the
+                    // janitor is not running, and the database is growing.
+                    <span className="text-warn-600 dark:text-warn-500">not yet run</span>
+                  ) : (
+                    <>
+                      {since(h.maintenance.at)}
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {h.maintenance.rolled_up} days aggregated ·{' '}
+                        {h.maintenance.heartbeats_pruned.toLocaleString()} checks pruned
+                        {h.maintenance.vacuumed && ' · space reclaimed'}
+                      </div>
+                      {h.maintenance.error !== undefined && h.maintenance.error !== '' && (
+                        <div className="text-xs text-down-600 dark:text-down-500">
+                          {h.maintenance.error}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </section>
 
           <section className="space-y-2 rounded-lg bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
             <h2 className="text-sm font-semibold">Files</h2>

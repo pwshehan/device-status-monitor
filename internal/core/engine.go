@@ -151,3 +151,19 @@ func incidentIDPtr(id int64) *int64 {
 	}
 	return &id
 }
+
+// JanitorStatus reports the last maintenance pass, for /api/health.
+func (a *App) JanitorStatus() api.JanitorStatus {
+	at, res := a.Janitor.LastPass()
+	status := api.JanitorStatus{
+		At:               at,
+		RolledUp:         res.RolledUp,
+		HeartbeatsPruned: res.HeartbeatsPruned,
+		RollupsPruned:    res.RollupsPruned,
+		Vacuumed:         res.Vacuumed,
+	}
+	if res.Err != nil {
+		status.Err = res.Err.Error()
+	}
+	return status
+}

@@ -42,6 +42,11 @@ type Engine interface {
 	// SchedulerLagMS is how far behind the most overdue device's probe is.
 	SchedulerLagMS() int64
 
+	// JanitorStatus reports the last maintenance pass. Retention that has
+	// quietly stopped running is invisible until the disk fills, so it is
+	// worth a line on the health endpoint.
+	JanitorStatus() JanitorStatus
+
 	// SendTestEmail delivers immediately, bypassing the outbox, and returns
 	// the SMTP error verbatim.
 	SendTestEmail(ctx context.Context, to []string) error
@@ -49,6 +54,16 @@ type Engine interface {
 	// SaveSMTPPassword seals a new password. The plaintext never reaches the
 	// database, and the API never returns it.
 	SaveSMTPPassword(ctx context.Context, plaintext string) error
+}
+
+// JanitorStatus is the outcome of the last maintenance pass.
+type JanitorStatus struct {
+	At               time.Time
+	RolledUp         int
+	HeartbeatsPruned int64
+	RollupsPruned    int64
+	Vacuumed         bool
+	Err              string
 }
 
 // Config is everything the server needs that is not behaviour.
