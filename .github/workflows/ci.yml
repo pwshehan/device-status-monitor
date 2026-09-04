@@ -34,3 +34,34 @@ jobs:
           GOARCH: amd64
           CGO_ENABLED: '0'
         run: go build ./...
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # The active LTS line. jsdom 30 needs >=24.15, and pinning the major
+          # here keeps a developer's machine and CI on the same runtime.
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # The build is the real check that the app compiles as shipped, not just
+      # that its types agree.
+      - name: Build
+        run: npm run build

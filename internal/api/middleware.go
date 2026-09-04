@@ -34,8 +34,54 @@ var allowedOriginHosts = map[string]bool{
 }
 
 // chain applies the middleware stack to a handler.
+//
+// The order matters in one non-obvious place: CORS sits after the origin and
+// host checks but before authentication, because a preflight carries no
+// Authorization header and would otherwise be answered with a 401 the browser
+// reports as a CORS failure.
 func (s *Server) chain(h http.Handler) http.Handler {
-	return s.recoverPanic(s.logRequests(s.checkRemoteAddr(s.checkOriginAndHost(s.authenticate(h)))))
+	return s.recoverPanic(
+		s.logRequests(
+			s.checkRemoteAddr(
+				s.checkOriginAndHost(
+					s.allowCORS(
+						s.authenticate(h))))))
+}
+
+// allowCORS tags responses for the pinned origins and answers preflights.
+//
+// It is needed because the UI is never same-origin with this service: the
+// Tauri webview runs on tauri://localhost and the Vite dev server on
+// http://localhost:5173, and both send an Authorization header, which is not
+// a CORS-safelisted one — so every request is preceded by a preflight.
+//
+// This gives away nothing. The origin allowlist is the same one that stops DNS
+// rebinding, so a page on an attacker's domain is already rejected with a 403
+// before it gets here; and a page that does sit on a loopback origin still
+// needs the bearer token, which any local process could read from the token
+// file anyway (§6's stated limitation). What CORS does not do is widen who can
+// reach the port.
+func (s *Server) allowCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			// checkOriginAndHost has already rejected anything not on the
+			// allowlist, so reaching here means the origin is one of ours.
+			h := w.Header()
+			h.Set("Access-Control-Allow-Origin", origin)
+			h.Add("Vary", "Origin")
+			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE")
+			h.Set("Access-Control-Max-Age", "600")
+		}
+
+		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+			// A preflight is answered here rather than routed: the mux has no
+			// OPTIONS patterns, and the checks that matter have already run.
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // recoverPanic keeps one bad request from taking the service down with it. The

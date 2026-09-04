@@ -4,9 +4,12 @@ Windows-native TCP endpoint monitor: a Go Windows Service does the probing, aler
 storage; a Tauri v2 desktop app is a thin client over a loopback REST API; SQLite (WAL) is
 the single store.
 
-- **Status:** Phases 0 and 1 built and tested; Phase 2 (the local API) is next
+- **Status:** Phases 0–3a built and tested; Phase 3b (the Tauri shell) is next
 - **Target:** Windows 10/11 x64, single machine, single user
-- **Dev host:** macOS (arm64) — see [Build reality](#0-build-reality-read-this-first)
+- **Dev host:** Windows 11 x64. The plan was written for a macOS host and §0 still
+  reads that way; everything in it holds either way, since the only host-specific
+  parts are the Windows-only build tags. Building on Windows has already paid for
+  itself once — see the Winsock bug in §14a
 - **Estimate:** ~14 focused dev-days across 7 phases
 
 ---
@@ -769,7 +772,7 @@ Each phase ends on something demonstrable. Estimates are focused dev-days.
 | 0 | ✅ Scaffolding | repo, module, `Makefile`, CI skeleton, `appdir`, `logx`, `store` open + migrations | `go test ./...` green on macOS; `GOOS=windows go build` produces an exe | 0.5 |
 | 1 | ✅ Engine core | `probe`, `scheduler`, `state`, `incidents`, batched writer, **effective-value resolution**, `notify` + outbox | `-dev` mode on macOS monitors 3 real endpoints in 2 groups, logs heartbeats, emails DOWN and RECOVERY with correct downtime; a group interval change reloads only its members | 3.25 |
 | 2 | ✅ API | `net/http` handlers, auth + origin middleware, SSE hub, `health`, `summary`, **group + bulk endpoints** | `curl` drives the full CRUD including group create/move/pause/delete; SSE prints a transition live; API tests green | 2.5 |
-| 3a | UI (browser) | Vite/React/Tailwind, grouped + flat dashboard, group manager, bulk move, device modal with inheritance placeholders, detail + uPlot + uptime strip, settings | Full UI working in Chrome on macOS against `-dev` | 3.75 |
+| 3a | ✅ UI (browser) | Vite/React/Tailwind, grouped + flat dashboard, group manager, bulk move, device modal with inheritance placeholders, detail + uPlot + uptime strip, settings | Full UI working in Chrome on macOS against `-dev` | 3.75 |
 | 3b | Tauri shell | install `rustup`, Tauri v2 init, tray, single-instance, autostart, CSP, service-down banner | `npm run tauri dev` runs the same UI natively | 1 |
 | 4 | Rollups & hardening | janitor, retention, DPAPI secrets, rate limit + **group-scoped digest**, restart recovery, graceful shutdown | 7-day soak with 50 fake devices across 6 groups: flat memory, DB bounded, no lost heartbeats across restarts, a simulated site outage produces one digest | 1.75 |
 | 5 | Windows service + installer | `svcrun`, subcommands, Event Log, `setup.iss`, `release.yml` | Tagged build yields a signed `Setup.exe` that installs, starts and survives reboot on a clean Windows 11 VM | 2 |
@@ -816,8 +819,24 @@ Places where the implementation departs from this plan, all deliberate:
 | Uptime endpoints read `rollups_daily` | Read rollups **and** fill any day the janitor has not aggregated from raw heartbeats, tagging each day `source: rollup \| raw \| mixed` | The janitor is Phase 4, so without this every uptime strip is empty until then and Phase 3a has nothing to build against. `source` is what stops the UI reading a raw day as an authoritative one — and once rollups exist they win, so the endpoint does not change shape |
 | Explicit DACL on `api.token` (`SYSTEM` + `Administrators` full, `Users` read) | Written `0600`, which on Windows means it inherits the `ProgramData` ACL — the same effective grants | Setting a DACL explicitly needs a Windows host to verify on, which is Phase 5. Noted as a compromise in `internal/api/token.go`, not silently skipped |
 | — | `store.ErrDuplicate` / `ErrConstraint`, classified by matching SQLite's constraint message text | The alternative is importing the driver's error type into the store's public error contract. A duplicate device is the user's mistake — a 409, not a 500 — and something has to make that call |
+| Nothing about CORS | `allowCORS` middleware for the already-pinned origins, answering preflights | The UI is never same-origin with the service: the Tauri webview is `tauri://localhost` and the dev server `http://localhost:5173`, and both send an `Authorization` header, which is not CORS-safelisted — so every request is preceded by a preflight that carries no credentials. It gives nothing away: the origin allowlist is the same one that stops DNS rebinding, and a page on a loopback origin still needs the token |
+| UI reads the API directly in dev | Vite proxies `/api` and injects the bearer token from `.dev-data/api.token` | A browser cannot read the token file, so the alternative is pasting a token into the app after every `rotate-token`. Proxying also makes the dev loop same-origin, so it does not depend on the CORS path above. The UI keeps its own token handling for the Tauri shell and for a browser pointed straight at the service |
+| Node version unstated | Node 24 LTS, pinned in CI and in `ui/package.json` engines | `jsdom` 30 requires ≥24.15, and pinning the major keeps a developer's machine and CI on one runtime. TypeScript is held at 6.0.3 rather than the current 7.x because `typescript-eslint` supports `<6.1` — type-aware linting is worth more here than being on the newest compiler |
 | `scheduler/effective.go` owns the resolution chain | `model/effective.go` (`model.Resolve`) | `state` and `notify` both need the resolved values; putting the type in `scheduler` would have made the state machine import the scheduler, which is backwards. `model` has no dependencies, so nothing gains one |
 | DPAPI secret sealing in Phase 4 | Built in Phase 1 (`internal/secret`) | The notifier needs the SMTP password to send anything, and there is no acceptable interim state where that password sits in the database as plaintext. Windows uses DPAPI at machine scope; elsewhere AES-GCM under a 0600 key file, so the dev loop is not plaintext either. **Exercised on Windows in Phase 2**: `PUT /api/settings` with a password stores `smtp.password_enc = dpapi:AQAAANCMnd8…` and `POST /api/settings/test-email` unseals it and reaches the SMTP dial, so both directions now have a real run behind them (still unverified under `LocalSystem`, which is Phase 5) |
+
+**Three bugs the Phase 3a work caught, all in code written the same day.** The
+device form dereferenced `device.group_id` after checking `device === undefined`
+on a prop typed `Device | null`, so *Add device* crashed the page — now guarded,
+and an error boundary means a render fault costs one screen rather than blanking
+a monitoring dashboard, which reads exactly like "everything is fine". The
+dashboard built its sections from the groups list alone, so a device whose group
+was missing from that list vanished silently; leftovers now land in an Ungrouped
+section. And `@custom-variant dark` had been redefined to a `.dark` class that
+nothing ever sets, which would have left every `dark:` utility in the app
+permanently inert — Tailwind 4 already follows `prefers-color-scheme`, so the
+override is gone. The first two were found by driving the real UI against the
+real service; no unit test had covered either path.
 
 **A Phase 1 bug the first Windows run caught.** `probe.classify` matched
 `syscall.ECONNREFUSED`, and Winsock does not reuse the POSIX errno numbers — so

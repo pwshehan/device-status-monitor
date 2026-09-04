@@ -1476,3 +1476,73 @@ func readSSEEvent(t *testing.T, body io.Reader) (eventType, data string) {
 		}
 	}
 }
+
+func TestCORSPreflightForOurOriginsOnly(t *testing.T) {
+	e := newEnv(t)
+
+	// A preflight from the dev server. It carries no Authorization header —
+	// browsers never put one on a preflight — so this is also the test that
+	// the CORS middleware sits before authentication in the chain.
+	req := localRequest(http.MethodOptions, "/api/devices", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPatch)
+	req.Header.Set("Access-Control-Request-Headers", "authorization,content-type")
+
+	rec := httptest.NewRecorder()
+	e.srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("preflight status = %d, want 204", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+		t.Errorf("allow-origin = %q, want the request's origin echoed", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(got, "Authorization") {
+		t.Errorf("allow-headers = %q, must permit Authorization or the real request never happens", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, http.MethodPatch) {
+		t.Errorf("allow-methods = %q, want PATCH", got)
+	}
+	if got := rec.Header().Get("Vary"); !strings.Contains(got, "Origin") {
+		t.Errorf("Vary = %q, want Origin — the response differs per origin", got)
+	}
+
+	// An authenticated request from the Tauri webview gets the header too,
+	// since the shell is cross-origin with the service just like the browser.
+	req = localRequest(http.MethodGet, "/api/devices", nil)
+	req.Header.Set("Origin", "tauri://localhost")
+	req.Header.Set("Authorization", "Bearer "+e.token)
+	rec = httptest.NewRecorder()
+	e.srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "tauri://localhost" {
+		t.Errorf("allow-origin = %q, want the Tauri origin", got)
+	}
+
+	// An attacker's page is still refused outright, and refused *without* the
+	// header — a 403 that permitted the origin to read the body would defeat
+	// the point of having the check.
+	req = localRequest(http.MethodOptions, "/api/devices", nil)
+	req.Header.Set("Origin", "https://attacker.example")
+	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	rec = httptest.NewRecorder()
+	e.srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("attacker preflight = %d, want 403", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("allow-origin = %q on a rejected origin, want none", got)
+	}
+
+	// A same-origin request sends no Origin at all and needs no CORS headers.
+	req = localRequest(http.MethodGet, "/api/health", nil)
+	rec = httptest.NewRecorder()
+	e.srv.Handler().ServeHTTP(rec, req)
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("allow-origin = %q with no Origin header, want none", got)
+	}
+}

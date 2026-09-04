@@ -8,7 +8,7 @@ VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DIST    := dist
 
-.PHONY: help build build-windows run seed test test-race vet fmt lint clean tidy
+.PHONY: help build build-windows run seed test test-race vet fmt lint clean tidy         ui-install ui-dev ui-build ui-test ui-lint check
 
 help:
 	@grep -E '^[a-z-]+:.*?##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -45,5 +45,22 @@ lint: vet ## Vet plus a gofmt check
 tidy: ## Tidy go.mod
 	go mod tidy
 
+ui-install: ## Install the UI's dependencies
+	cd ui && npm ci
+
+ui-dev: ## Run the UI dev server against the running service on :49215
+	cd ui && npm run dev
+
+ui-build: ## Type-check and build the UI into ui/dist
+	cd ui && npm run build
+
+ui-test: ## Run the UI unit tests
+	cd ui && npm test
+
+ui-lint: ## Type-check and lint the UI
+	cd ui && npm run typecheck && npm run lint
+
+check: lint test ui-lint ui-test ## Everything CI runs, minus the cross-builds
+
 clean: ## Remove build output and the dev database
-	rm -rf $(DIST) .dev-data
+	rm -rf $(DIST) .dev-data ui/dist

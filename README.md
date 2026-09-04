@@ -1,8 +1,9 @@
 # Local Device Monitor
 
 Windows-native TCP endpoint monitoring. A Go service probes, alerts and stores;
-a Tauri desktop app (not yet built) is a thin client over a loopback REST API;
-SQLite in WAL mode is the single store.
+a React dashboard is a thin client over a loopback REST API; SQLite in WAL mode
+is the single store. The Tauri shell that wraps the dashboard natively is the
+next phase — until then the same UI runs in any browser.
 
 See [PLAN.md](PLAN.md) for the full architecture and the phase plan.
 
@@ -13,8 +14,8 @@ See [PLAN.md](PLAN.md) for the full architecture and the phase plan.
 | 0 | Scaffolding | **done** |
 | 1 | Engine core — probe, state machine, incidents, groups, SMTP outbox | **done** |
 | 2 | Local REST API + SSE | **done** |
-| 3a | UI in the browser | next |
-| 3b | Tauri shell | |
+| 3a | UI in the browser | **done** |
+| 3b | Tauri shell | next |
 | 4 | Rollups, retention, hardening | |
 | 5 | Windows service + installer | |
 | 6 | Acceptance and docs | |
@@ -47,6 +48,32 @@ Inspect what it recorded:
 ```bash
 sqlite3 .dev-data/monitor.db "SELECT name, status, last_latency_ms FROM devices"
 ```
+
+## The dashboard
+
+Node 24 LTS. Start the service first — the dev server reads its token file and
+attaches it to every proxied request, so nothing has to be pasted anywhere:
+
+```bash
+cd ui && npm ci && npm run dev
+```
+
+Then open http://localhost:5173. Requests to `/api` are proxied to the service
+on 49215, which keeps the browser same-origin and means the token never reaches
+the page.
+
+Seven screens: a dashboard that groups devices by site (or goes flat for
+triage), device detail with a uPlot latency chart and a 90-day availability
+strip, the group manager, group detail, settings, and a service page showing
+scheduler lag and where the files are. Status badges update over SSE rather
+than polling.
+
+```bash
+cd ui && npm test
+```
+
+`npm run build` type-checks and produces `ui/dist`, which is what the Tauri
+shell will load in Phase 3b.
 
 ## Building for Windows
 
@@ -131,6 +158,10 @@ internal/secret         DPAPI (Windows) / AES-GCM (elsewhere)
 internal/api            HTTP handlers, auth + origin middleware, SSE hub
 internal/core           wiring: evaluator, writer, refresh loop, API
 internal/svcrun         Windows Service vs. foreground
+ui/src/api              typed client, SSE parser
+ui/src/hooks            TanStack Query hooks, the event stream
+ui/src/components       table, badges, uptime strip, sparkline, uPlot chart
+ui/src/pages            dashboard, device, groups, group, settings, service
 ```
 
 ## Configuration

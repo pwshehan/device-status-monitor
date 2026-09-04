@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+
+/*
+ * Tailwind 4 is configured in CSS rather than a JS config file.
+ *
+ * The palette is deliberately small: one accent, and three status colours that
+ * have to stay distinguishable at the size of a 4px uptime block and for the
+ * ~8% of men with red/green colour blindness — so DOWN is not only red, it is
+ * also the only status with a filled badge, and the uptime strip carries a
+ * tooltip rather than relying on hue alone.
+ */
+@theme {
+  --color-accent-50: oklch(97% 0.02 195);
+  --color-accent-100: oklch(93% 0.04 195);
+  --color-accent-500: oklch(58% 0.09 195);
+  --color-accent-600: oklch(50% 0.09 195);
+  --color-accent-700: oklch(42% 0.08 195);
+
+  --color-up-100: oklch(94% 0.06 150);
+  --color-up-500: oklch(62% 0.14 150);
+  --color-up-600: oklch(52% 0.13 150);
+
+  --color-down-100: oklch(94% 0.05 25);
+  --color-down-500: oklch(58% 0.19 25);
+  --color-down-600: oklch(50% 0.19 25);
+
+  --color-warn-100: oklch(95% 0.06 80);
+  --color-warn-500: oklch(72% 0.15 80);
+  --color-warn-600: oklch(62% 0.14 80);
+}
+
+/*
+ * Dark/light follows the OS, per §8.
+ *
+ * That is Tailwind 4's default `dark:` behaviour (prefers-color-scheme), so
+ * there is deliberately no @custom-variant override here: redefining it to a
+ * `.dark` class would mean every dark: utility in the app waits for a class
+ * nothing sets, and the whole theme would silently never apply.
+ */
+html {
+  color-scheme: light dark;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    @apply bg-slate-950 text-slate-100;
+  }
+}
+
+/* uPlot ships its own stylesheet; scope the parts we override. */
+@import 'uplot/dist/uPlot.min.css';
+
+.uplot,
+.uplot *,
+.uplot *::before,
+.uplot *::after {
+  box-sizing: border-box;
+}
+
+.u-tooltip {
+  @apply pointer-events-none absolute z-20 rounded-md bg-slate-900/95 px-2 py-1 text-xs text-white shadow-lg;
+}
+
+/* Focus rings that survive both themes, since this app is keyboard-driven for
+   triage: tab to a row, space to select, enter to open. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent-500;
+}
