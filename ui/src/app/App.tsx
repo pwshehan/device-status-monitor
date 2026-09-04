@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
 
 import { ServiceDownBanner } from '../components/ServiceDownBanner'
 import { useHealth } from '../hooks/queries'
+import { setTrayStatus } from '../lib/shell'
 import { Dashboard } from '../pages/Dashboard'
 import { DeviceDetail } from '../pages/DeviceDetail'
 import { GroupDetail } from '../pages/GroupDetail'
@@ -35,6 +37,12 @@ export function App() {
 function Shell() {
   const health = useHealth()
   const stream = useStream()
+
+  // Keep the tray tooltip in step with the badge counts. A no-op in a browser.
+  const { up, down, paused } = health.data ?? { up: 0, down: 0, paused: 0 }
+  useEffect(() => {
+    void setTrayStatus(up, down, paused)
+  }, [up, down, paused])
 
   return (
     <div className="min-h-dvh">

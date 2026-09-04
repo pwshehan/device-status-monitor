@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- App icon: a monitored link that is up. The pulse is the product in one
+       glyph — a series of probes, one of which spikes — and it stays legible
+       at 16px in a tray, where anything more detailed turns to mud. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12808c"/>
+      <stop offset="1" stop-color="#0b5a63"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M88 288 H176 L212 176 L268 336 L304 256 H424"
+        fill="none" stroke="#ffffff" stroke-width="34"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="424" cy="256" r="30" fill="#7ef0a8"/>
+</svg>

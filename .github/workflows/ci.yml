@@ -65,3 +65,40 @@ jobs:
       # that its types agree.
       - name: Build
         run: npm run build
+
+  # The desktop shell only builds on Windows — MSVC and WebView2 headers — so
+  # this is the one job that would catch a broken tray, capability file or CSP
+  # before a release tag does.
+  shell:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri
+
+      - run: npm ci
+
+      # tauri::generate_context! reads tauri.conf.json and needs frontendDist
+      # to exist, so the frontend is built before Rust is compiled at all.
+      - name: Build the frontend
+        run: npm run build:tauri
+
+      - name: Format check
+        working-directory: ui/src-tauri
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: ui/src-tauri
+        run: cargo clippy --all-targets -- -D warnings

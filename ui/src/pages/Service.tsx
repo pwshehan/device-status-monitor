@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { apiToken, setApiToken } from '../api/client'
 import { useStream } from '../app/StreamContext'
 import { Button, ErrorNote, Field, Spinner, Tile, inputClass } from '../components/ui'
 import { useHealth } from '../hooks/queries'
 import { bytes, duration } from '../lib/format'
+import { isAutostartEnabled, isDesktopShell, setAutostart } from '../lib/shell'
 
 /**
  * Service status: what the engine is doing, where its files are, and the token
@@ -94,6 +95,8 @@ export function Service() {
         </>
       )}
 
+      {isDesktopShell() && <DesktopOptions />}
+
       <section className="space-y-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
         <h2 className="text-sm font-semibold">API token</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -144,5 +147,64 @@ export function Service() {
         </div>
       </section>
     </div>
+  )
+}
+
+/**
+ * Shell-only settings. Rendered only inside the desktop app, since none of it
+ * means anything in a browser tab.
+ */
+function DesktopOptions() {
+  const [autostart, setAutostartState] = useState<boolean | null>(null)
+  const [error, setError] = useState<unknown>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void isAutostartEnabled().then((on) => {
+      if (!cancelled) setAutostartState(on)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const toggle = async (on: boolean) => {
+    setError(null)
+    try {
+      await setAutostart(on)
+      setAutostartState(on)
+    } catch (err) {
+      setError(err)
+    }
+  }
+
+  return (
+    <section className="space-y-3 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+      <h2 className="text-sm font-semibold">This window</h2>
+      <ErrorNote error={error} />
+
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 rounded border-slate-300 accent-accent-600"
+          checked={autostart === true}
+          disabled={autostart === null}
+          onChange={(e) => void toggle(e.target.checked)}
+        />
+        <span>
+          Open this dashboard when I sign in
+          <span className="block text-xs text-slate-500 dark:text-slate-400">
+            Only the window. The service starts with the machine regardless, and keeps monitoring
+            whether anyone is signed in or not.
+          </span>
+        </span>
+      </label>
+
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Closing this window hides it to the tray and changes nothing about monitoring. Quitting
+        from the tray does not stop the service either — use{' '}
+        <code className="font-mono">monitor-service stop</code> for that.
+      </p>
+    </section>
   )
 }

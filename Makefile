@@ -8,7 +8,9 @@ VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DIST    := dist
 
-.PHONY: help build build-windows run seed test test-race vet fmt lint clean tidy         ui-install ui-dev ui-build ui-test ui-lint check
+.PHONY: help build build-windows run seed test test-race vet fmt lint clean tidy \
+        ui-install ui-dev ui-build ui-test ui-lint \
+        app-dev app-build app-lint check
 
 help:
 	@grep -E '^[a-z-]+:.*?##' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -59,6 +61,15 @@ ui-test: ## Run the UI unit tests
 
 ui-lint: ## Type-check and lint the UI
 	cd ui && npm run typecheck && npm run lint
+
+app-dev: ## Run the desktop shell against the dev server (Windows, needs Rust)
+	cd ui && npm run tauri:dev
+
+app-build: ## Build the desktop app and its installer (Windows only)
+	cd ui && npm run tauri:build
+
+app-lint: ## Format check and clippy on the shell
+	cd ui/src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings
 
 check: lint test ui-lint ui-test ## Everything CI runs, minus the cross-builds
 

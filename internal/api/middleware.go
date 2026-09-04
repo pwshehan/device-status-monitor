@@ -187,11 +187,13 @@ func hostAllowed(host string) bool {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		name = h
 	}
-	return allowedOriginHosts[strings.ToLower(strings.Trim(name, "[]"))]
+	return loopbackHost(name)
 }
 
 func originAllowed(origin string) bool {
-	// The Tauri webview sends this rather than an http origin.
+	// The Tauri webview's own origin. On Windows it is served over the custom
+	// protocol as http://tauri.localhost, and on macOS as tauri://localhost;
+	// both are the same shell and both have to be recognised.
 	if origin == "tauri://localhost" {
 		return true
 	}
@@ -204,7 +206,21 @@ func originAllowed(origin string) bool {
 	default:
 		return false
 	}
-	return allowedOriginHosts[strings.ToLower(strings.Trim(u.Hostname(), "[]"))]
+	return loopbackHost(u.Hostname())
+}
+
+// loopbackHost reports whether a hostname names this machine.
+//
+// The .localhost suffix is included because that is where a Tauri webview
+// lives on Windows. It is reserved by RFC 6761 and every browser resolves it
+// to the loopback interface, so a page on such an origin is already running
+// locally — and it still needs the bearer token, which any local process could
+// read from the token file anyway (§6's stated limitation). What this must
+// never do is admit a name that could be registered publicly, which is exactly
+// what the DNS-rebinding check exists to stop.
+func loopbackHost(name string) bool {
+	name = strings.ToLower(strings.Trim(name, "[]"))
+	return allowedOriginHosts[name] || strings.HasSuffix(name, ".localhost")
 }
 
 // authenticate requires a bearer token, except on /api/health.

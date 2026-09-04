@@ -5,7 +5,10 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'coverage'] },
+  // src-tauri/target holds Rust build output, including the compressed copies
+  // of our own bundle that tauri-codegen embeds — linting those is both
+  // meaningless and a parse error.
+  { ignores: ['dist', 'node_modules', 'coverage', 'src-tauri/target', 'src-tauri/gen'] },
   js.configs.recommended,
   {
     // The type-aware rules are scoped to TypeScript only: applying them to

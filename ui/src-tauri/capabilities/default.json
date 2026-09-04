@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the dashboard window may ask the shell for. Deliberately tiny: the page talks to the monitoring service over HTTP rather than through Rust, so it needs no filesystem, shell, process or window permissions. Showing and hiding the window is decided in Rust, by the tray and the close handler, not by the page.",
+  "windows": ["main"],
+  "permissions": ["core:default", "autostart:default"]
+}

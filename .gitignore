@@ -6,3 +6,7 @@ node_modules/
 *.db-wal
 *.db-shm
 .DS_Store
+
+# Rust build output for the desktop shell
+ui/src-tauri/target/
+ui/src-tauri/gen/

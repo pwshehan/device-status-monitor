@@ -1546,3 +1546,55 @@ func TestCORSPreflightForOurOriginsOnly(t *testing.T) {
 		t.Errorf("allow-origin = %q with no Origin header, want none", got)
 	}
 }
+
+func TestTauriWebviewOriginIsAllowed(t *testing.T) {
+	e := newEnv(t)
+
+	// The desktop shell is cross-origin with this service on every platform,
+	// and which origin it presents depends on the platform: Windows serves the
+	// app from http://tauri.localhost over the custom protocol, macOS from
+	// tauri://localhost. Rejecting either is a blank window with a CORS error
+	// in a console nobody opens.
+	for _, origin := range []string{
+		"tauri://localhost",
+		"http://tauri.localhost",
+		"https://tauri.localhost",
+	} {
+		t.Run(origin, func(t *testing.T) {
+			req := localRequest(http.MethodGet, "/api/devices", nil)
+			req.Header.Set("Origin", origin)
+			req.Header.Set("Authorization", "Bearer "+e.token)
+
+			rec := httptest.NewRecorder()
+			e.srv.Handler().ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			if got := rec.Header().Get("Access-Control-Allow-Origin"); got != origin {
+				t.Errorf("allow-origin = %q, want %q", got, origin)
+			}
+		})
+	}
+
+	// A public name that merely contains "localhost" is not a loopback name,
+	// and admitting one would undo the rebinding check entirely.
+	for _, origin := range []string{
+		"http://localhost.attacker.example",
+		"http://notlocalhost",
+		"http://tauri.localhost.attacker.example",
+	} {
+		t.Run("rejects "+origin, func(t *testing.T) {
+			req := localRequest(http.MethodGet, "/api/devices", nil)
+			req.Header.Set("Origin", origin)
+			req.Header.Set("Authorization", "Bearer "+e.token)
+
+			rec := httptest.NewRecorder()
+			e.srv.Handler().ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("status = %d, want 403", rec.Code)
+			}
+		})
+	}
+}

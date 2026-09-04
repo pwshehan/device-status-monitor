@@ -1,9 +1,9 @@
 # Local Device Monitor
 
 Windows-native TCP endpoint monitoring. A Go service probes, alerts and stores;
-a React dashboard is a thin client over a loopback REST API; SQLite in WAL mode
-is the single store. The Tauri shell that wraps the dashboard natively is the
-next phase — until then the same UI runs in any browser.
+a React dashboard in a Tauri desktop shell is a thin client over a loopback
+REST API; SQLite in WAL mode is the single store. The same UI runs in a plain
+browser, which is how it is developed.
 
 See [PLAN.md](PLAN.md) for the full architecture and the phase plan.
 
@@ -15,8 +15,8 @@ See [PLAN.md](PLAN.md) for the full architecture and the phase plan.
 | 1 | Engine core — probe, state machine, incidents, groups, SMTP outbox | **done** |
 | 2 | Local REST API + SSE | **done** |
 | 3a | UI in the browser | **done** |
-| 3b | Tauri shell | next |
-| 4 | Rollups, retention, hardening | |
+| 3b | Tauri shell | **done** |
+| 4 | Rollups, retention, hardening | next |
 | 5 | Windows service + installer | |
 | 6 | Acceptance and docs | |
 
@@ -72,8 +72,46 @@ than polling.
 cd ui && npm test
 ```
 
-`npm run build` type-checks and produces `ui/dist`, which is what the Tauri
-shell will load in Phase 3b.
+`npm run build` type-checks and produces `ui/dist`, which is what the desktop
+shell loads.
+
+## The desktop app
+
+A Tauri v2 shell around the same UI. It needs Rust with the MSVC toolchain,
+Visual Studio Build Tools with the C++ workload, and WebView2 (already on
+Windows 11).
+
+```bash
+cd ui && npm run tauri:dev
+```
+
+```bash
+cd ui && npm run tauri:build
+```
+
+The build produces `ui/src-tauri/target/release/local-monitor-gui.exe` (3.8 MB)
+and `bundle/nsis/Local Monitor_0.1.0_x64-setup.exe` (1.7 MB), which installs it
+as **Local Monitor**. Idle footprint is around 28 MB, because the window is a
+WebView2 host and nothing else — the monitoring all happens in the service.
+
+What the shell adds over the browser:
+
+- **The token, without asking.** It reads `api.token` from the service's data
+  folder and injects it before the page's own code runs, so there is nothing to
+  paste. A missing token is not fatal — health still answers unauthenticated,
+  so the window can say what is wrong.
+- **A tray icon** with the up/down counts in its tooltip, pushed by the page
+  rather than polled, so the shell adds no load of its own to the API.
+- **Closing hides to the tray**, and the Quit item says *"Quit (monitoring
+  continues)"* — because on a monitoring app, "quit" otherwise reads as "stop
+  watching". Nothing the window does touches the service; use
+  `monitor-service stop` for that.
+- **One instance.** A second launch raises the existing window instead of
+  opening a second event stream.
+- **Optional autostart** for the window, on the Service page. The service
+  starts with the machine either way, signed in or not.
+- **A locked CSP**: `default-src 'self'; connect-src http://127.0.0.1:49215`,
+  so the page can reach the monitoring service and nothing else.
 
 ## Building for Windows
 

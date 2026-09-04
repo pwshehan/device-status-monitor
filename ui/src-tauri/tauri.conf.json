@@ -1,0 +1,44 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Local Monitor",
+  "version": "0.1.0",
+  "identifier": "lk.gkgraphite.localmonitor",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build:tauri",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; connect-src http://127.0.0.1:49215 http://localhost:49215; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
+      "capabilities": [
+        "default"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "GK Graphite",
+    "copyright": "GK Graphite",
+    "category": "Utility",
+    "shortDescription": "Local device monitoring",
+    "longDescription": "Watches TCP endpoints on the local network and emails when one stops answering. The monitoring service runs independently of this window.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    }
+  }
+}

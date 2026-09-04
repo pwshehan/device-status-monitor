@@ -1,0 +1,36 @@
+[package]
+name = "local-monitor-gui"
+version = "0.1.0"
+description = "Local Monitor desktop shell"
+authors = ["GK Graphite"]
+edition = "2021"
+rust-version = "1.77"
+
+# The library is what the mobile targets would link; keeping main.rs a
+# three-line shim over it is the shape Tauri v2 expects.
+[lib]
+name = "local_monitor_gui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+# Used by `tauri dev` to enable the dev-only pieces of the framework.
+default = []
+
+[profile.release]
+# The shell is a thin wrapper around a webview; optimise it for size rather
+# than speed, since nothing in it is hot.
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

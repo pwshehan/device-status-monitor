@@ -4,7 +4,7 @@ Windows-native TCP endpoint monitor: a Go Windows Service does the probing, aler
 storage; a Tauri v2 desktop app is a thin client over a loopback REST API; SQLite (WAL) is
 the single store.
 
-- **Status:** Phases 0–3a built and tested; Phase 3b (the Tauri shell) is next
+- **Status:** Phases 0–3b built and tested; Phase 4 (rollups and hardening) is next
 - **Target:** Windows 10/11 x64, single machine, single user
 - **Dev host:** Windows 11 x64. The plan was written for a macOS host and §0 still
   reads that way; everything in it holds either way, since the only host-specific
@@ -34,8 +34,10 @@ This is the biggest practical constraint and the source document does not cover 
 2. The React UI is developed in a **plain browser** via `npm run dev` against the Go service
    on `127.0.0.1:49215`. No Rust toolchain needed for 90% of UI work.
 3. Rust/Tauri is only needed for the native shell (tray icon, single-instance, autostart,
-   window chrome) and the final binary. Install `rustup` when Phase 3b starts; it is **not
-   installed on this machine today**.
+   window chrome) and the final binary. Installed in Phase 3b: `rustup` with the
+   `stable-x86_64-pc-windows-msvc` toolchain. The heavy prerequisite — Visual Studio Build
+   Tools with the C++ workload and the Windows SDK — was already on the machine, which is
+   the part worth checking before budgeting a day for this phase.
 4. Windows artifacts (`monitor-gui.exe`, `setup.exe`) come out of GitHub Actions on every tag.
    A Windows box (or Parallels/UTM VM) is still required once per phase for acceptance testing —
    service install, SYSTEM-account behaviour and SmartScreen cannot be verified in CI.
@@ -759,6 +761,7 @@ skips signing (with a warning) when they do not.
 | API | `httptest` + real DB: auth pass/fail, non-loopback rejection, bad `Origin`, validation errors, SSE receives an event within 1 s of a transition |
 | Notify | stub SMTP server (`emersion/go-smtp`) for all three security modes; outbox backoff with a fake clock; digest collapsing |
 | UI | `vitest` + Testing Library on the table/badge/uptime-strip components; MSW for the API |
+| Desktop shell | `cargo test` on the pure parts — tray tooltip wording, and that the injected token is escaped so a token file written by anything on the machine cannot run code in the window. The window itself is verified by launching the built exe against a running service and checking the API sees an authenticated SSE client and rejects nothing |
 | Windows acceptance | Manual checklist per release: install → service auto-starts → survives reboot → unplug a monitored device → DOWN mail in ~90 s → replug → RECOVERY mail with correct duration → GUI shows the incident → upgrade preserves DB → uninstall removes the service |
 
 ---
@@ -773,7 +776,7 @@ Each phase ends on something demonstrable. Estimates are focused dev-days.
 | 1 | ✅ Engine core | `probe`, `scheduler`, `state`, `incidents`, batched writer, **effective-value resolution**, `notify` + outbox | `-dev` mode on macOS monitors 3 real endpoints in 2 groups, logs heartbeats, emails DOWN and RECOVERY with correct downtime; a group interval change reloads only its members | 3.25 |
 | 2 | ✅ API | `net/http` handlers, auth + origin middleware, SSE hub, `health`, `summary`, **group + bulk endpoints** | `curl` drives the full CRUD including group create/move/pause/delete; SSE prints a transition live; API tests green | 2.5 |
 | 3a | ✅ UI (browser) | Vite/React/Tailwind, grouped + flat dashboard, group manager, bulk move, device modal with inheritance placeholders, detail + uPlot + uptime strip, settings | Full UI working in Chrome on macOS against `-dev` | 3.75 |
-| 3b | Tauri shell | install `rustup`, Tauri v2 init, tray, single-instance, autostart, CSP, service-down banner | `npm run tauri dev` runs the same UI natively | 1 |
+| 3b | ✅ Tauri shell | install `rustup`, Tauri v2 init, tray, single-instance, autostart, CSP, service-down banner | `npm run tauri dev` runs the same UI natively | 1 |
 | 4 | Rollups & hardening | janitor, retention, DPAPI secrets, rate limit + **group-scoped digest**, restart recovery, graceful shutdown | 7-day soak with 50 fake devices across 6 groups: flat memory, DB bounded, no lost heartbeats across restarts, a simulated site outage produces one digest | 1.75 |
 | 5 | Windows service + installer | `svcrun`, subcommands, Event Log, `setup.iss`, `release.yml` | Tagged build yields a signed `Setup.exe` that installs, starts and survives reboot on a clean Windows 11 VM | 2 |
 | 6 | Acceptance & docs | manual checklist, README, troubleshooting, log/DB locations | Checklist in §12 passes end to end; v1.0.0 released | 1 |
@@ -821,6 +824,10 @@ Places where the implementation departs from this plan, all deliberate:
 | — | `store.ErrDuplicate` / `ErrConstraint`, classified by matching SQLite's constraint message text | The alternative is importing the driver's error type into the store's public error contract. A duplicate device is the user's mistake — a 409, not a 500 — and something has to make that call |
 | Nothing about CORS | `allowCORS` middleware for the already-pinned origins, answering preflights | The UI is never same-origin with the service: the Tauri webview is `tauri://localhost` and the dev server `http://localhost:5173`, and both send an `Authorization` header, which is not CORS-safelisted — so every request is preceded by a preflight that carries no credentials. It gives nothing away: the origin allowlist is the same one that stops DNS rebinding, and a page on a loopback origin still needs the token |
 | UI reads the API directly in dev | Vite proxies `/api` and injects the bearer token from `.dev-data/api.token` | A browser cannot read the token file, so the alternative is pasting a token into the app after every `rotate-token`. Proxying also makes the dev loop same-origin, so it does not depend on the CORS path above. The UI keeps its own token handling for the Tauri shell and for a browser pointed straight at the service |
+| The GUI window declared in `tauri.conf.json` | Built in `setup()` with `WebviewWindowBuilder` | A statically-declared window cannot carry an `initialization_script`, and the API token has to be in the page *before* its bundle evaluates — the client reads `window.__MONITOR_TOKEN__` at module scope. Injecting it afterwards would flash the "not authorised" banner on every launch |
+| — | The tray tooltip is pushed from the page (`set_tray_status`), not polled by Rust | The window is already subscribed to the event stream, so a poller in the shell would double the load on the API to learn what the page knows already. The cost is that the tooltip stops updating if the webview dies — acceptable, because the tray is a convenience and the service is unaffected either way |
+| CSP `connect-src http://127.0.0.1:49215` | Same, plus `http://localhost:49215` | Both names resolve to the same loopback interface and either can end up in a URL; allowing only one turns a working configuration into a blank screen with a console error. The origin allowlist on the service side is the check that actually matters |
+| Autostart, unqualified | Autostart applies to the *window* only, and the UI says so | The service already starts with the machine, signed in or not. Without the distinction on screen, unticking the box reads as "stop monitoring at boot", which would be the opposite of what it does |
 | Node version unstated | Node 24 LTS, pinned in CI and in `ui/package.json` engines | `jsdom` 30 requires ≥24.15, and pinning the major keeps a developer's machine and CI on one runtime. TypeScript is held at 6.0.3 rather than the current 7.x because `typescript-eslint` supports `<6.1` — type-aware linting is worth more here than being on the newest compiler |
 | `scheduler/effective.go` owns the resolution chain | `model/effective.go` (`model.Resolve`) | `state` and `notify` both need the resolved values; putting the type in `scheduler` would have made the state machine import the scheduler, which is backwards. `model` has no dependencies, so nothing gains one |
 | DPAPI secret sealing in Phase 4 | Built in Phase 1 (`internal/secret`) | The notifier needs the SMTP password to send anything, and there is no acceptable interim state where that password sits in the database as plaintext. Windows uses DPAPI at machine scope; elsewhere AES-GCM under a 0600 key file, so the dev loop is not plaintext either. **Exercised on Windows in Phase 2**: `PUT /api/settings` with a password stores `smtp.password_enc = dpapi:AQAAANCMnd8…` and `POST /api/settings/test-email` unseals it and reaches the SMTP dial, so both directions now have a real run behind them (still unverified under `LocalSystem`, which is Phase 5) |
