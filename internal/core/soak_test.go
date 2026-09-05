@@ -207,6 +207,12 @@ func TestSoak(t *testing.T) {
 	}
 	restarted.Janitor.Now = func() time.Time { return time.Now().AddDate(0, 0, 2) }
 
+	// Stop probing first. The janitor's clock is two days ahead, so any
+	// heartbeat written *during* the pass is already older than the cutoff and
+	// counts as a survivor — the assertion below would race the scheduler
+	// rather than test retention.
+	restarted.Scheduler.Stop()
+
 	before, err := restarted.Store.DBSizeBytes(ctx)
 	if err != nil {
 		t.Fatal(err)

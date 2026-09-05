@@ -83,7 +83,16 @@ func (w *Worker) drain(ctx context.Context) int {
 			HTML:    a.BodyHTML,
 		})
 		if err == nil {
-			if err := w.Store.MarkSent(ctx, a.ID, time.Now()); err != nil {
+			// Recorded on a context that shutdown cannot cancel. The mail has
+			// already left by this point, so cancelling here does not undo
+			// anything — it only loses the record, and the row would be picked
+			// up and delivered a second time on the next start. A duplicate
+			// outage email after a restart is small, but it is exactly the kind
+			// of small thing that teaches people to distrust the alerts.
+			markCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			err := w.Store.MarkSent(markCtx, a.ID, time.Now())
+			cancel()
+			if err != nil {
 				log.Error("mark alert sent", "id", a.ID, "err", err)
 			}
 			sent++
@@ -91,6 +100,8 @@ func (w *Worker) drain(ctx context.Context) int {
 			continue
 		}
 
+		// The failure path needs no such care: losing the record of a failed
+		// attempt costs one earlier retry, which is the harmless direction.
 		exhausted, markErr := w.Store.MarkFailed(ctx, a.ID, a.Attempts, err, time.Now())
 		if markErr != nil {
 			log.Error("mark alert failed", "id", a.ID, "err", markErr)

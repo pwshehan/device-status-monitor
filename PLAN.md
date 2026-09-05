@@ -4,7 +4,8 @@ Windows-native TCP endpoint monitor: a Go Windows Service does the probing, aler
 storage; a Tauri v2 desktop app is a thin client over a loopback REST API; SQLite (WAL) is
 the single store.
 
-- **Status:** Phases 0–4 done; Phase 5 built but not yet accepted (needs one install/reboot run)
+- **Status:** Phases 0–4 and 6's documentation done. Phases 5 and 6 both wait on the same
+  thing: one install-and-reboot run on a Windows machine (`installer/ACCEPTANCE.md`)
 - **Target:** Windows 10/11 x64, single machine, single user
 - **Dev host:** Windows 11 x64. The plan was written for a macOS host and §0 still
   reads that way; everything in it holds either way, since the only host-specific
@@ -785,7 +786,7 @@ Each phase ends on something demonstrable. Estimates are focused dev-days.
 | 3b | ✅ Tauri shell | install `rustup`, Tauri v2 init, tray, single-instance, autostart, CSP, service-down banner | `npm run tauri dev` runs the same UI natively | 1 |
 | 4 | ✅ Rollups & hardening | janitor, retention, DPAPI secrets, rate limit + **group-scoped digest**, restart recovery, graceful shutdown | 7-day soak with 50 fake devices across 6 groups: flat memory, DB bounded, no lost heartbeats across restarts, a simulated site outage produces one digest | 1.75 |
 | 5 | 🔨 Windows service + installer | `svcrun`, subcommands, Event Log, `setup.iss`, `release.yml` | Tagged build yields a `Setup.exe` that installs, starts and survives reboot on a clean Windows 11 VM. **Built and compiling; the install/reboot run is outstanding** — see §16 q1 | 2 |
-| 6 | Acceptance & docs | manual checklist, README, troubleshooting, log/DB locations | Checklist in §12 passes end to end; v1.0.0 released | 1 |
+| 6 | 🔨 Acceptance & docs | manual checklist, README, troubleshooting, log/DB locations | Checklist in §12 passes end to end; v1.0.0 released. **Docs done** (`README.md`, `docs/TROUBLESHOOTING.md`, `CHANGELOG.md`, `installer/ACCEPTANCE.md`); the checklist run and the tag are outstanding | 1 |
 
 **~15.5 days**, of which grouping accounts for about 1.5 — a quarter-day of schema and
 resolution, half a day of API and digest routing, three quarters of a day of UI. Cheap because it
@@ -843,6 +844,18 @@ Places where the implementation departs from this plan, all deliberate:
 | Node version unstated | Node 24 LTS, pinned in CI and in `ui/package.json` engines | `jsdom` 30 requires ≥24.15, and pinning the major keeps a developer's machine and CI on one runtime. TypeScript is held at 6.0.3 rather than the current 7.x because `typescript-eslint` supports `<6.1` — type-aware linting is worth more here than being on the newest compiler |
 | `scheduler/effective.go` owns the resolution chain | `model/effective.go` (`model.Resolve`) | `state` and `notify` both need the resolved values; putting the type in `scheduler` would have made the state machine import the scheduler, which is backwards. `model` has no dependencies, so nothing gains one |
 | DPAPI secret sealing in Phase 4 | Built in Phase 1 (`internal/secret`) | The notifier needs the SMTP password to send anything, and there is no acceptable interim state where that password sits in the database as plaintext. Windows uses DPAPI at machine scope; elsewhere AES-GCM under a 0600 key file, so the dev loop is not plaintext either. **Exercised on Windows in Phase 2**: `PUT /api/settings` with a password stores `smtp.password_enc = dpapi:AQAAANCMnd8…` and `POST /api/settings/test-email` unseals it and reaches the SMTP dial, so both directions now have a real run behind them (still unverified under `LocalSystem`, which is Phase 5) |
+
+**A duplicate-alert bug that a flaky test led to.** `TestRestartResumesWithoutRealerting` and
+`TestSoak` both failed intermittently, but only under CPU contention. Chasing the first one found
+something real: the notifier recorded a delivery with `MarkSent(ctx, …)` on the run context, so a
+shutdown landing between the mail leaving and `sent_at` being written left the row unsent — and
+the next start delivered it again. The send has already happened by that point, so cancelling
+there undoes nothing and only loses the record. Fixed with `context.WithoutCancel`, and pinned by
+a test whose sender cancels the context as it returns. The second failure was the soak test's own
+race: the scheduler kept writing heartbeats while the janitor pruned, so "exactly zero rows
+remain" was racing probing rather than testing retention. **The lesson: an intermittent test is a
+question, not a nuisance** — one of these two was a product bug and one was not, and re-running
+until green would have shipped the first.
 
 **Three bugs the Phase 3a work caught, all in code written the same day.** The
 device form dereferenced `device.group_id` after checking `device === undefined`
@@ -907,15 +920,17 @@ transition just mutated.**
    between Phase 5 and done.** The installer compiles and the service code is exercised by the
    suite, but "installs, starts and survives reboot" cannot be claimed without running it, and
    reboot survival in particular cannot be tested on a machine that is in use.
-2. **Device count** — sized for 200. If it is closer to 1 000, the writer becomes a real
-   bottleneck and heartbeats should be downsampled at write time.
+2. **Device count** — sized for 200, and shipped that way. `TestSoak` runs 50 devices and the
+   design holds to a few hundred; at 1 000 the writer becomes a real bottleneck and heartbeats
+   should be downsampled at write time. Revisit if it is ever pointed at that many.
 3. ~~**Code-signing certificate**~~ — **answered: ship unsigned.** Internal tool; the
    SmartScreen warning is accepted and `SHA256SUMS` covers verification. The signing steps have
    been removed from `release.yml` rather than left dormant, so the workflow says what it does.
 4. **Multi-machine later?** v1 is one machine. If several sites need monitoring, the split is
    agent (Go) + central server, which changes the API's trust model — worth knowing now.
-5. **Retention default** — 14 days raw. Longer if you ever need per-probe forensics beyond two weeks.
-6. **Group shape** — I have planned flat, one-group-per-device (§3.1). Say so now if you actually
-   need either **nesting** (site → rack → device, roughly +1 day for the tree UI and recursive
-   queries) or **many-to-many** membership, because the latter changes what group uptime can mean
-   and is not a later migration.
+5. **Retention default** — shipped at 14 days raw and 400 days of summaries, both settings, both
+   changeable from the UI. Raise `retention.raw_days` if per-probe forensics beyond two weeks are
+   ever needed; the daily summaries are unaffected either way.
+6. **Group shape** — shipped flat, one group per device (§3.1). Nesting is a later migration
+   (one nullable `parent_id` and a recursive CTE, roughly +1 day for the tree UI); many-to-many
+   is **not**, because it changes what group uptime can mean. Say so before that matters.

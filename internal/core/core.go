@@ -197,9 +197,12 @@ func Start(parent context.Context, o Options) (*App, error) {
 
 // startAPI generates or reads the bearer token and binds the listener.
 //
-// A failure here fails the whole start: a monitor with no control channel is a
-// service the GUI reports as down, and pretending otherwise would leave the
-// SCM claiming a healthy service nobody can reach.
+// A failure here fails the whole start, for two reasons. A monitor with no
+// control channel is a service the GUI reports as down, and pretending
+// otherwise would leave the SCM claiming a healthy service nobody can reach.
+// More importantly the bind doubles as the single-instance guard: SQLite in WAL
+// mode will happily let a second process open the same database, so without
+// this a stray second copy would double every probe and every alert.
 func (a *App) startAPI(ctx context.Context, o Options) error {
 	token, err := api.LoadOrCreateToken(o.Dirs.TokenFile())
 	if err != nil {
