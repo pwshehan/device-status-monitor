@@ -4,9 +4,15 @@
     {
       "name": "ui",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "ui",
-      "port": 5173
+      "port": 5173,
+      "env": {
+        "MONITOR_API": "http://127.0.0.1:49216"
+      }
     }
   ]
 }

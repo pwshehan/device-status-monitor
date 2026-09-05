@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { badgeOf, compareForTriage, duration, uptimePct, uptimeTone } from '../lib/format'
 import { makeDevice } from '../test/server'
 import { renderWithProviders } from '../test/render'
-import { Sparkline } from './Sparkline'
+import { StatusStrip } from './StatusStrip'
 import { StatusBadge } from './StatusBadge'
 import { UptimeStrip } from './UptimeStrip'
 
@@ -145,26 +145,39 @@ describe('UptimeStrip', () => {
   })
 })
 
-describe('Sparkline', () => {
-  it('marks failures and skips gaps rather than joining across them', () => {
+describe('StatusStrip', () => {
+  it('draws one block per check, most recent last', () => {
     const { container } = renderWithProviders(
-      <Sparkline values={[4, null, 8, 900]} downs={[false, true, false, false]} />,
+      <StatusStrip checks={['UP', 'UP', 'DOWN', 'UP']} slots={4} />,
     )
-    const svg = container.querySelector('svg')
-    expect(svg).toHaveAttribute('aria-label', expect.stringContaining('900'))
+    const blocks = container.querySelectorAll('span')
+    expect(blocks).toHaveLength(4)
 
-    // Two path segments, because the null is a break, not a straight line
-    // through an outage.
-    const d = container.querySelector('path')?.getAttribute('d') ?? ''
-    expect(d.match(/M/g)).toHaveLength(2)
-
-    // The failed check gets a tick of its own.
-    expect(container.querySelectorAll('line')).toHaveLength(1)
+    // Red where the check failed, green either side of it.
+    expect(blocks[2]?.className).toContain('bg-down-500')
+    expect(blocks[3]?.className).toContain('bg-up-500')
   })
 
-  it('renders a dash when there is nothing to draw', () => {
-    renderWithProviders(<Sparkline values={[]} />)
-    expect(screen.getByText('—')).toBeInTheDocument()
+  it('right-aligns a short history so "now" is always the last block', () => {
+    // A device checked twice should not read as thirty-eight failures.
+    const { container } = renderWithProviders(<StatusStrip checks={['UP', 'DOWN']} slots={6} />)
+    const blocks = container.querySelectorAll('span')
+
+    expect(blocks).toHaveLength(6)
+    expect(blocks[0]?.className).toContain('bg-slate-200')
+    expect(blocks[4]?.className).toContain('bg-up-500')
+    expect(blocks[5]?.className).toContain('bg-down-500')
+  })
+
+  it('says what it is showing rather than only colouring it', () => {
+    renderWithProviders(<StatusStrip checks={['UP', 'UP', 'DOWN']} />)
+    // Colour alone is not a label, and red/green is the worst pair to rely on.
+    expect(screen.getByRole('img')).toHaveAccessibleName('2 of the last 3 checks succeeded')
+  })
+
+  it('is honest about having no history yet', () => {
+    renderWithProviders(<StatusStrip checks={[]} />)
+    expect(screen.getByRole('img')).toHaveAccessibleName('No checks recorded yet')
   })
 })
 

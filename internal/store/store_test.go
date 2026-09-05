@@ -500,3 +500,75 @@ func TestTagFilterMatchesWholeTags(t *testing.T) {
 		t.Errorf("tag filter returned %d rows (%v); 'non-critical' must not match 'critical'", len(got), got)
 	}
 }
+
+func TestRecentChecksAreOldestFirstAndPerDevice(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+
+	a, err := s.CreateDevice(ctx, model.Device{
+		Name: "a", IPAddress: "10.0.0.1", Port: 22, Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.CreateDevice(ctx, model.Device{
+		Name: "b", IPAddress: "10.0.0.2", Port: 22, Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Six checks for a, the middle two failing; two for b.
+	base := time.Now().Add(-time.Hour)
+	var batch []model.Heartbeat
+	for i := 0; i < 6; i++ {
+		status := model.StatusUp
+		if i == 2 || i == 3 {
+			status = model.StatusDown
+		}
+		batch = append(batch, model.Heartbeat{
+			DeviceID: a.ID, Status: status, LatencyMS: 4,
+			CheckedAt: base.Add(time.Duration(i) * time.Minute),
+		})
+	}
+	for i := 0; i < 2; i++ {
+		batch = append(batch, model.Heartbeat{
+			DeviceID: b.ID, Status: model.StatusDown, LatencyMS: 3000,
+			CheckedAt: base.Add(time.Duration(i) * time.Minute),
+		})
+	}
+	if err := s.InsertHeartbeats(ctx, batch); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.RecentChecks(ctx, []int64{a.ID, b.ID}, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The most recent four, in the order they happened: a strip drawn from
+	// these reads left to right like time does.
+	wantA := []model.Status{
+		model.StatusDown, model.StatusDown, model.StatusUp, model.StatusUp,
+	}
+	if len(got[a.ID]) != len(wantA) {
+		t.Fatalf("device a: %v, want %v", got[a.ID], wantA)
+	}
+	for i := range wantA {
+		if got[a.ID][i] != wantA[i] {
+			t.Errorf("device a position %d = %s, want %s", i, got[a.ID][i], wantA[i])
+		}
+	}
+
+	// The limit is per device, not across the result: b's two must survive a
+	// noisier neighbour.
+	if len(got[b.ID]) != 2 {
+		t.Errorf("device b: %v, want its own two checks", got[b.ID])
+	}
+
+	// A device with no history is absent rather than empty-but-present, and
+	// the caller treats both the same way.
+	if _, ok := got[9999]; ok {
+		t.Error("a device with no checks should not appear")
+	}
+}

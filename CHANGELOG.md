@@ -74,6 +74,10 @@ machine to install on and cannot be claimed without doing it.
 - A React dashboard: grouped and flat views, bulk move/pause/delete, device
   detail with a uPlot latency chart and shaded outages, group manager, settings,
   and a service page showing scheduler lag and the last maintenance pass.
+- Each row carries a **recent-checks strip** — one block per check, green for
+  answered and red for not. It is seeded from the last 40 checks the server
+  holds, so it reads correctly the moment the page opens rather than filling in
+  over the following minutes, and heartbeats extend it live from there.
 - A Tauri desktop shell: tray with up/down counts, close-to-tray, single
   instance, optional autostart for the window, and a locked CSP. It reads the
   API token from disk so nothing has to be pasted.

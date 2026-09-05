@@ -46,6 +46,7 @@ export function makeDevice(overrides: Partial<Device> = {}): Device {
       },
       ...overrides.effective,
     },
+    recent_checks: 'UUUUUUUU',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,

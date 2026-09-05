@@ -14,8 +14,9 @@ const (
 	EventDeviceStatus EventType = "device_status"
 	// EventGroupStatus carries a group's tallies after a member changed state.
 	EventGroupStatus EventType = "group_status"
-	// EventHeartbeat fires on every probe result: this is the sparkline feed
-	// and the only high-rate event, which is why a subscriber can filter it out.
+	// EventHeartbeat fires on every probe result: this is what keeps a row's
+	// status strip moving, and the only high-rate event, which is why a
+	// subscriber can filter it out.
 	EventHeartbeat EventType = "heartbeat"
 	// EventIncident fires when an outage opens or closes.
 	EventIncident EventType = "incident"

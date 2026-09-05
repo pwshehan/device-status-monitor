@@ -75,8 +75,34 @@ type deviceDTO struct {
 
 	Effective effectiveDTO `json:"effective"`
 
+	// RecentChecks is the last few outcomes, oldest first, as one character
+	// each: "U" up, "D" down.
+	//
+	// A compact string rather than an array because this ships for every
+	// device on every refresh, and the dashboard refreshes whenever anything
+	// changes state: 200 devices × 40 checks is 8 kB this way and 40 kB as
+	// JSON booleans. It carries no latency — the strip it draws answers "has
+	// this been steady?", and the device's own page has the rest.
+	RecentChecks string `json:"recent_checks"`
+
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
+}
+
+// encodeChecks renders check outcomes for the wire.
+func encodeChecks(checks []model.Status) string {
+	if len(checks) == 0 {
+		return ""
+	}
+	out := make([]byte, 0, len(checks))
+	for _, c := range checks {
+		if c == model.StatusUp {
+			out = append(out, 'U')
+		} else {
+			out = append(out, 'D')
+		}
+	}
+	return string(out)
 }
 
 func newDeviceDTO(d model.Device, eff model.Effective) deviceDTO {

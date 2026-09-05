@@ -586,8 +586,9 @@ group — a core switch outage should not send 60 emails.
    - **Flat** — one table, sorted by status then name. Keep this: when everything is on fire,
      grouping is in the way, and triage wants one list of what is down.
    Either mode shows name, `ip:port`, live badge (`UP` green, `DOWN` red, `TIMEOUT` amber,
-   `PAUSED` grey, `UNKNOWN`), last check, last latency, sparkline, and row actions (check now,
-   pause, edit, delete). Filter by group, tag or status; collapsed-section state persists locally.
+   `PAUSED` grey, `UNKNOWN`), last check, last latency, a recent-checks strip (one block
+   per check, green for up and red for down), and row actions (check now, pause,
+   edit, delete). Filter by group, tag or status; collapsed-section state persists locally.
    Row checkboxes enable bulk **Move to group…**, pause and delete via `/api/devices/bulk`.
 2. **Device detail** — 24 h uPlot latency line with `DOWN` spans shaded; 90-day uptime strip as
    a CSS grid of 90 divs coloured by `uptime_pct` (green ≥99.9, amber ≥95, red below, hatched

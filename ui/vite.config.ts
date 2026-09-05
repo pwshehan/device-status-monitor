@@ -30,8 +30,18 @@ function readDevToken(): string | null {
   }
 }
 
+/**
+ * Where the dev server forwards /api.
+ *
+ * Overridable because the installed service owns 49215 on a machine that has
+ * one, so developing against a second instance means running it on another
+ * port: `monitor-service -dev -api-addr 127.0.0.1:49216` with
+ * `MONITOR_API=http://127.0.0.1:49216 npm run dev`.
+ */
+const API_TARGET = process.env.MONITOR_API ?? 'http://127.0.0.1:49215'
+
 const apiProxy: ProxyOptions = {
-  target: 'http://127.0.0.1:49215',
+  target: API_TARGET,
   changeOrigin: true,
   // Server-Sent Events must not be buffered or the dashboard goes quiet.
   ws: false,

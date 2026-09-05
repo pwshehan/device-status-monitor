@@ -55,6 +55,12 @@ export interface Device {
 
   effective: Effective
 
+  /**
+   * The last checks, oldest first, one character each: "U" up, "D" down.
+   * Compact because it ships for every device on every refresh.
+   */
+  recent_checks: string
+
   created_at: string
   updated_at: string
 }

@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
-import type { RowHistory } from '../components/DeviceTable'
 import type { StreamState } from '../hooks/useEventStream'
+import type { RowHistory } from '../hooks/useHistory'
 
 export interface StreamContextValue {
   state: StreamState

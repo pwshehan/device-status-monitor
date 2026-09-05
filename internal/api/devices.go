@@ -107,12 +107,32 @@ func (s *Server) handleListDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// One query for the whole page rather than one per row: the strip is
+	// refetched every time any device changes state.
+	ids := make([]int64, 0, len(devices))
+	for _, d := range devices {
+		ids = append(ids, d.ID)
+	}
+	recent, err := s.st.RecentChecks(r.Context(), ids, RecentCheckCount)
+	if err != nil {
+		// A missing strip is a cosmetic loss; the list itself is the answer.
+		s.log.Warn("read recent checks", "err", err)
+		recent = nil
+	}
+
 	out := make([]deviceDTO, 0, len(devices))
 	for _, d := range devices {
-		out = append(out, newDeviceDTO(d, res.Resolve(d)))
+		dto := newDeviceDTO(d, res.Resolve(d))
+		dto.RecentChecks = encodeChecks(recent[d.ID])
+		out = append(out, dto)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"devices": out})
 }
+
+// RecentCheckCount is how many outcomes a row strip shows. Forty is about a
+// screen's worth at the size a table row allows, and twenty minutes of history
+// on the default interval.
+const RecentCheckCount = 40
 
 func (s *Server) handleGetDevice(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
@@ -131,7 +151,12 @@ func (s *Server) handleGetDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := map[string]any{"device": newDeviceDTO(d, res.Resolve(d))}
+	dto := newDeviceDTO(d, res.Resolve(d))
+	if recent, err := s.st.RecentChecks(r.Context(), []int64{id}, RecentCheckCount); err == nil {
+		dto.RecentChecks = encodeChecks(recent[id])
+	}
+
+	body := map[string]any{"device": dto}
 
 	// The open incident comes with the device: the detail page always needs
 	// it, and a second round trip to find out "no outage" is waste.

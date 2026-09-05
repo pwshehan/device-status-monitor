@@ -68,7 +68,7 @@ func (a *App) SaveSMTPPassword(ctx context.Context, plaintext string) error {
 // --- event publishing --------------------------------------------------------
 
 // publishHeartbeat announces one probe result. This is the high-rate feed the
-// sparklines read.
+// dashboard's status strips read.
 func (a *App) publishHeartbeat(eff model.Effective, res probe.Result, status model.Status) {
 	a.Hub.Publish(api.Event{Type: api.EventHeartbeat, Data: api.HeartbeatEvent{
 		DeviceID:  eff.DeviceID,

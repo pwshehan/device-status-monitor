@@ -173,3 +173,53 @@ func (s *Store) HeartbeatSeries(ctx context.Context, deviceID int64, from, to ti
 		})
 	return out, err
 }
+
+// RecentChecks returns the last `limit` check outcomes for each device, oldest
+// first.
+//
+// One query for every device on the dashboard rather than one per device: a
+// row strip that cost a request each would be 200 requests on a full page, and
+// it is refetched every time any device changes state.
+//
+// Only the outcome is returned, not the latency — this feeds a strip whose
+// whole job is "has this been steady?", and the latency of a check that
+// succeeded three minutes ago is on the device's own page.
+func (s *Store) RecentChecks(ctx context.Context, deviceIDs []int64, limit int) (map[int64][]model.Status, error) {
+	if len(deviceIDs) == 0 {
+		return map[int64][]model.Status{}, nil
+	}
+	if limit <= 0 {
+		limit = 40
+	}
+
+	in := inClause(len(deviceIDs))
+	args := make([]any, 0, len(deviceIDs)+1)
+	for _, id := range deviceIDs {
+		args = append(args, id)
+	}
+	args = append(args, limit)
+
+	out := make(map[int64][]model.Status, len(deviceIDs))
+	err := s.eachRow(ctx, `
+		SELECT device_id, status FROM (
+			SELECT device_id, status, checked_at,
+			       ROW_NUMBER() OVER (
+			           PARTITION BY device_id ORDER BY checked_at DESC, id DESC
+			       ) AS rn
+			FROM heartbeats
+			WHERE device_id IN (`+in+`)
+		)
+		WHERE rn <= ?
+		ORDER BY device_id, checked_at, rn DESC`,
+		args,
+		func(rows *sql.Rows) error {
+			var id int64
+			var status string
+			if err := rows.Scan(&id, &status); err != nil {
+				return err
+			}
+			out[id] = append(out[id], model.Status(status))
+			return nil
+		})
+	return out, err
+}

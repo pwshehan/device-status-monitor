@@ -1,15 +1,11 @@
 import { Link } from 'react-router-dom'
 
 import type { Device } from '../api/types'
+import { mergeChecks, type RowHistory } from '../hooks/useHistory'
 import { addr, badgeOf, latency, since } from '../lib/format'
-import { Sparkline } from './Sparkline'
 import { StatusBadge } from './StatusBadge'
+import { StatusStrip } from './StatusStrip'
 import { Button } from './ui'
-
-export interface RowHistory {
-  values: (number | null)[]
-  downs: boolean[]
-}
 
 interface Props {
   devices: Device[]
@@ -62,7 +58,11 @@ export function DeviceTable({
               the answer. */}
           <th className="hidden px-2 py-2 font-medium md:table-cell">Last check</th>
           <th className="px-2 py-2 font-medium">Latency</th>
-          <th className="hidden px-2 py-2 font-medium lg:table-cell">24 h</th>
+          {/* Named for what it is: the last checks, not a fixed span of time.
+              How long they cover depends on the device's interval. */}
+          <th className="hidden px-2 py-2 font-medium lg:table-cell" title="The last 40 checks">
+            Recent checks
+          </th>
           <th className="px-2 py-2 text-right font-medium">Actions</th>
         </tr>
       </thead>
@@ -127,7 +127,7 @@ export function DeviceTable({
                 {latency(device.last_latency_ms)}
               </td>
               <td className="hidden px-2 py-2 lg:table-cell">
-                <Sparkline values={rows?.values ?? []} {...(rows ? { downs: rows.downs } : {})} />
+                <StatusStrip checks={mergeChecks(device, rows)} />
               </td>
               <td className="px-2 py-2">
                 <div className="flex justify-end gap-1">
