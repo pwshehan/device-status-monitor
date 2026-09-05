@@ -3,7 +3,8 @@ import { resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig, type PluginOption, type ProxyOptions } from 'vite'
+import type { PluginOption, ProxyOptions } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 /**
  * The dev server proxies /api to the Go service and injects the bearer token

@@ -106,8 +106,8 @@ export function LatencyChart({ samples, incidents, height = 240 }: Props) {
             const now = Date.now() / 1000
             for (const span of spansRef.current) {
               const end = span.to ?? now
-              const x0 = u.valToPos(Math.max(span.from, u.scales.x.min ?? span.from), 'x', true)
-              const x1 = u.valToPos(Math.min(end, u.scales.x.max ?? end), 'x', true)
+              const x0 = u.valToPos(Math.max(span.from, u.scales.x?.min ?? span.from), 'x', true)
+              const x1 = u.valToPos(Math.min(end, u.scales.x?.max ?? end), 'x', true)
               if (x1 > x0) ctx.fillRect(x0, u.bbox.top, x1 - x0, u.bbox.height)
             }
             ctx.restore()

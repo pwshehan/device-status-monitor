@@ -7,6 +7,9 @@ node_modules/
 *.db-shm
 .DS_Store
 
+# tsc -b writes these next to the tsconfig it built
+*.tsbuildinfo
+
 # Rust build output for the desktop shell
 ui/src-tauri/target/
 ui/src-tauri/gen/
