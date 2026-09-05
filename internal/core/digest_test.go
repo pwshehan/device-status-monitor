@@ -96,7 +96,8 @@ func TestSiteOutageCollapsesIntoOneMail(t *testing.T) {
 	sender := &capturingSender{}
 
 	app, err := Start(ctx, Options{
-		Dirs: dataDirs, Log: quietLog(),
+		UpdateInterval: -1,
+		Dirs:           dataDirs, Log: quietLog(),
 		Prober: prober, Sender: sender,
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,
@@ -183,7 +184,8 @@ func TestTwoDevicesStillGetTheirOwnMails(t *testing.T) {
 	sender := &capturingSender{}
 
 	app, err := Start(ctx, Options{
-		Dirs: dataDirs, Log: quietLog(),
+		UpdateInterval: -1,
+		Dirs:           dataDirs, Log: quietLog(),
 		Prober: prober, Sender: sender,
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,
@@ -227,7 +229,8 @@ func TestCollapseCanBeSwitchedOff(t *testing.T) {
 	sender := &capturingSender{}
 
 	app, err := Start(ctx, Options{
-		Dirs: dataDirs, Log: quietLog(),
+		UpdateInterval: -1,
+		Dirs:           dataDirs, Log: quietLog(),
 		Prober: prober, Sender: sender,
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,
@@ -275,7 +278,8 @@ func TestHourlyCapPausesMailAndSaysSo(t *testing.T) {
 	sender := &capturingSender{}
 
 	app, err := Start(ctx, Options{
-		Dirs: dataDirs, Log: quietLog(),
+		UpdateInterval: -1,
+		Dirs:           dataDirs, Log: quietLog(),
 		Prober: prober, Sender: sender,
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,

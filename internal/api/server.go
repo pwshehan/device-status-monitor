@@ -13,6 +13,7 @@ import (
 
 	"github.com/pwshehan/device-status-monitor/internal/probe"
 	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/update"
 )
 
 // DefaultAddr is the loopback address the service listens on. Never 0.0.0.0:
@@ -54,6 +55,21 @@ type Engine interface {
 	// SaveSMTPPassword seals a new password. The plaintext never reaches the
 	// database, and the API never returns it.
 	SaveSMTPPassword(ctx context.Context, plaintext string) error
+
+	// UpdateStatus is what the last check found and what has been staged.
+	UpdateStatus() update.Status
+
+	// CheckUpdate asks GitHub now instead of waiting for the next pass.
+	CheckUpdate(ctx context.Context) update.Status
+
+	// DownloadUpdate stages the installer for the newest known release. Only
+	// needed when automatic downloads are off.
+	DownloadUpdate(ctx context.Context) error
+
+	// InstallUpdate runs the staged installer and returns immediately. It
+	// returns before the installer starts, because the installer stops this
+	// service and nothing waiting past that point would ever be answered.
+	InstallUpdate(ctx context.Context) error
 }
 
 // JanitorStatus is the outcome of the last maintenance pass.
@@ -144,6 +160,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("PUT /api/settings", s.handlePutSettings)
 	mux.HandleFunc("POST /api/settings/test-email", s.handleTestEmail)
+
+	mux.HandleFunc("GET /api/update", s.handleUpdate)
+	mux.HandleFunc("POST /api/update/check", s.handleUpdateCheck)
+	mux.HandleFunc("POST /api/update/download", s.handleUpdateDownload)
+	mux.HandleFunc("POST /api/update/install", s.handleUpdateInstall)
 
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 

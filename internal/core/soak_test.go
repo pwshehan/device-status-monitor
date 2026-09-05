@@ -105,7 +105,7 @@ func TestSoak(t *testing.T) {
 
 	opts := func() Options {
 		return Options{
-			Dirs: dataDirs, Log: quietLog(),
+			Dirs: dataDirs, Log: quietLog(), UpdateInterval: -1,
 			Prober: counting, Sender: &capturingSender{},
 			MaxConcurrent:    16,
 			RefreshInterval:  500 * time.Millisecond,
