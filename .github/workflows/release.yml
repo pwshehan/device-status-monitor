@@ -1,0 +1,153 @@
+name: Release
+
+# Everything a release needs is Windows-only — the Tauri shell needs MSVC and
+# WebView2 headers, and Inno Setup has no cross-platform compiler — so this
+# whole job runs on windows-latest. See §0 of PLAN.md.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (without the leading v)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $env:GITHUB_REF -replace '^refs/tags/v', ''
+          } else {
+            '${{ inputs.version }}'
+          }
+          if (-not $version) { throw 'no version to build' }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "building $version"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri
+
+      # A release that ships code the suite has not seen is not worth the
+      # convenience of skipping this.
+      - name: Test the engine
+        run: go test ./...
+
+      - name: Build the engine
+        shell: pwsh
+        run: |
+          $env:CGO_ENABLED = '0'
+          go build -ldflags "-s -w -X main.version=${{ steps.version.outputs.version }}" `
+            -o dist/monitor-service.exe ./cmd/monitor-service
+
+      - name: Build the dashboard and shell
+        working-directory: ui
+        run: |
+          npm ci
+          npm run tauri:build
+
+      - name: Stage the GUI where the installer expects it
+        shell: pwsh
+        run: |
+          # The Cargo crate name is what names the binary; the installer, the
+          # Start Menu entry and the service's sibling are all "monitor-gui".
+          Copy-Item ui/src-tauri/target/release/local-monitor-gui.exe dist/monitor-gui.exe
+
+      # WebView2 is on every Windows 11 and every updated Windows 10, so this
+      # is only a fallback. Bundled rather than downloaded at install time
+      # because the machine being installed on may have no internet.
+      - name: Fetch the WebView2 bootstrapper
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' `
+            -OutFile dist/MicrosoftEdgeWebview2Setup.exe
+
+      # Deliberately unsigned. This is an internal tool, so an OV certificate
+      # would buy a smoother first launch on machines the same people already
+      # administer — and an EV one would need a hardware token that CI cannot
+      # hold anyway. SmartScreen will say "Windows protected your PC" and some
+      # antivirus will look twice at a service-installing binary; SHA256SUMS
+      # below is what lets someone check they got what was built. If this is
+      # ever distributed more widely, revisit PLAN.md §11.
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          # Found rather than hardcoded: $env:ProgramFiles(x86) is not valid
+          # PowerShell syntax, and chocolatey and the official installer put
+          # ISCC in different places.
+          $iscc = Get-ChildItem 'C:\Program Files (x86)', 'C:\Program Files', "$env:LOCALAPPDATA\Programs" `
+            -Filter ISCC.exe -Recurse -Depth 3 -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $iscc) { throw 'ISCC.exe not found after installing Inno Setup' }
+          & $iscc.FullName /DAppVersion=${{ steps.version.outputs.version }} installer\setup.iss
+          if ($LASTEXITCODE -ne 0) { throw 'installer build failed' }
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          # So someone downloading an unsigned build has some way to check they
+          # got what was built.
+          Get-ChildItem dist/*.exe | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Out-File -Encoding ascii dist/SHA256SUMS
+
+      - name: Publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $signed = 'Unsigned by design (internal tool) - SmartScreen will warn on first run. ' +
+            'Check the download against SHA256SUMS.'
+
+          # Built as an array rather than a here-string: a PowerShell
+          # here-string needs its closing marker at column zero, which cannot
+          # happen inside an indented YAML block.
+          $notes = @(
+            "Local Device Monitor $version",
+            '',
+            $signed,
+            '',
+            "**Install:** run ``LocalMonitor-Setup-$version.exe`` as an administrator. It registers",
+            'the `LocalMonitorSvc` service, starts it, and puts the dashboard in the Start Menu.',
+            '',
+            'Monitoring history lives in `C:\ProgramData\LocalMonitor` and is never touched by an',
+            'upgrade. Uninstalling keeps it unless you choose otherwise.'
+          ) -join "`n"
+          $notesFile = Join-Path $env:RUNNER_TEMP 'notes.md'
+          Set-Content -Path $notesFile -Value $notes -Encoding utf8
+
+          $setup = (Get-ChildItem dist/LocalMonitor-Setup-*.exe | Select-Object -First 1).FullName
+          gh release create "v$version" `
+            --title "Local Device Monitor $version" `
+            --notes-file $notesFile `
+            $setup `
+            dist/monitor-service.exe `
+            dist/monitor-gui.exe `
+            dist/SHA256SUMS

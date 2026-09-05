@@ -157,12 +157,15 @@ func Install(exePath string) error {
 		return fmt.Errorf("set recovery actions: %w", err)
 	}
 
+	// Registering the Event Log source is what lets the service explain a
+	// failed start somewhere an administrator will look. Not fatal if it
+	// fails — the service still runs and still writes its log file — but the
+	// caller is told, because silently having no Event Log entries is exactly
+	// the sort of thing nobody discovers until they need one.
 	if err := eventlog.InstallAsEventCreate(ServiceName,
 		eventlog.Error|eventlog.Warning|eventlog.Info); err != nil &&
 		!errors.Is(err, os.ErrExist) {
-		// Not fatal: the service runs fine, it just cannot report a startup
-		// failure as nicely.
-		return nil
+		return fmt.Errorf("service installed, but registering its Event Log source failed: %w", err)
 	}
 	return nil
 }

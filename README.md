@@ -17,8 +17,8 @@ See [PLAN.md](PLAN.md) for the full architecture and the phase plan.
 | 3a | UI in the browser | **done** |
 | 3b | Tauri shell | **done** |
 | 4 | Rollups, retention, hardening | **done** |
-| 5 | Windows service + installer | next |
-| 6 | Acceptance and docs | |
+| 5 | Windows service + installer | **built, not yet accepted** |
+| 6 | Acceptance and docs | next |
 
 ## Developing on macOS or Linux
 
@@ -212,6 +212,35 @@ change, so ~105 s on the defaults rather than ~90 s. A group whose every member
 has failed flushes at once, and `alert.collapse_sec: 0` restores immediate
 per-device mail.
 
+## Installing
+
+The release workflow builds `LocalMonitor-Setup-<version>.exe` on a tag. Run it
+as an administrator: it installs both executables into
+`C:\Program Files\LocalMonitor`, registers `LocalMonitorSvc` to start with the
+machine as `LocalSystem`, starts it, and adds the dashboard to the Start Menu.
+
+History lives in `C:\ProgramData\LocalMonitor` and is **never touched by an
+upgrade** — an upgrade replaces the executables and restarts the service, and
+migrations run on start. Uninstalling keeps the history unless you choose
+otherwise during setup.
+
+Builds are unsigned until a certificate exists, so SmartScreen will say
+"Windows protected your PC" and some antivirus will quarantine a
+service-installing binary. Verify a download against the `SHA256SUMS` attached
+to the release.
+
+To build the installer locally on Windows (needs Inno Setup 6 on PATH):
+
+```bash
+make release-local VERSION=1.0.0
+```
+
+Everything here is covered by automated tests except what needs a real machine
+to install on — the service registering with the SCM, running as `LocalSystem`
+and surviving a reboot. That gap is written out as a fifteen-minute checklist in
+[installer/ACCEPTANCE.md](installer/ACCEPTANCE.md), and it has **not been run
+yet**.
+
 ## Service commands (Windows only)
 
 ```
@@ -221,6 +250,18 @@ monitor-service.exe start | stop
 monitor-service.exe status
 monitor-service.exe rotate-token  issue a new API token
 ```
+
+The service registers itself rather than being created with `sc.exe`: `binPath`
+quoting is a classic source of installers that appear to succeed and leave a
+service that cannot start, and `sc.exe` cannot set failure actions in the same
+step. It restarts after 5s, 10s and 30s on a crash, with the counter reset
+daily.
+
+A service has no console, so a failure to start goes to the **Windows Event
+Log** under source `LocalMonitorSvc` as well as to
+`C:\ProgramData\LocalMonitor\logs`. Only warnings and errors go to the Event
+Log — an entry per probe would make the Application log useless for everyone
+else on the machine.
 
 ## Layout
 

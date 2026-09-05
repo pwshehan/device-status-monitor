@@ -128,11 +128,17 @@ func run() error {
 	}
 
 	asService := svcrun.IsService()
-	log, closer := logx.Setup(logx.Options{
+	logOpts := logx.Options{
 		File:    dirs.LogFile(),
 		Console: !asService,
 		Level:   *level,
-	})
+	}
+	if asService {
+		// Only under the SCM: an administrator looking for why monitoring
+		// stopped opens Event Viewer, not a folder under ProgramData.
+		logOpts.EventLogSource = svcrun.ServiceName
+	}
+	log, closer := logx.Setup(logOpts)
 	if closer != nil {
 		defer closer.Close()
 	}

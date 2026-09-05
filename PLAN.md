@@ -4,7 +4,7 @@ Windows-native TCP endpoint monitor: a Go Windows Service does the probing, aler
 storage; a Tauri v2 desktop app is a thin client over a loopback REST API; SQLite (WAL) is
 the single store.
 
-- **Status:** Phases 0–4 built and tested; Phase 5 (the Windows service and installer) is next
+- **Status:** Phases 0–4 done; Phase 5 built but not yet accepted (needs one install/reboot run)
 - **Target:** Windows 10/11 x64, single machine, single user
 - **Dev host:** Windows 11 x64. The plan was written for a macOS host and §0 still
   reads that way; everything in it holds either way, since the only host-specific
@@ -733,10 +733,13 @@ SYSTEM) and the GUI (as user) share one data path.
   `ProgramData\LocalMonitor` is deleted (default: keep the history).
 - Migrations run on service start, so upgrade is "replace exe, restart service".
 
-**Code signing** — unsigned, SmartScreen will show "Windows protected your PC" and some AV will
-quarantine a service-installing binary. Budget an OV/EV code-signing certificate; the release
-workflow signs both exes and the installer when `CERT_PFX`/`CERT_PASSWORD` secrets exist and
-skips signing (with a warning) when they do not.
+**Code signing** — **decided: not signing.** This is an internal tool, administered by the same
+people whose machines it runs on, so an OV certificate would buy a smoother first launch and
+little else, and an EV one needs a hardware token that CI cannot hold. The consequence is
+accepted rather than worked around: SmartScreen says "Windows protected your PC", and some
+antivirus will look twice at a service-installing binary. `SHA256SUMS` is attached to every
+release so a download can be checked against what was built. Revisit if this is ever
+distributed beyond the organisation.
 
 **CI**
 
@@ -762,7 +765,7 @@ skips signing (with a warning) when they do not.
 | Notify | stub SMTP server (`emersion/go-smtp`) for all three security modes; outbox backoff with a fake clock; digest collapsing |
 | UI | `vitest` + Testing Library on the table/badge/uptime-strip components; MSW for the API |
 | Desktop shell | `cargo test` on the pure parts — tray tooltip wording, and that the injected token is escaped so a token file written by anything on the machine cannot run code in the window. The window itself is verified by launching the built exe against a running service and checking the API sees an authenticated SSE client and rejects nothing |
-| Windows acceptance | Manual checklist per release: install → service auto-starts → survives reboot → unplug a monitored device → DOWN mail in ~90 s **plus the collapse window** (105 s on the defaults; §7's digest cannot collapse without waiting) → replug → RECOVERY mail with correct duration → GUI shows the incident → upgrade preserves DB → uninstall removes the service |
+| Windows acceptance | `installer/ACCEPTANCE.md` — manual checklist per release: install → service auto-starts → survives reboot → unplug a monitored device → DOWN mail in ~90 s **plus the collapse window** (105 s on the defaults; §7's digest cannot collapse without waiting) → replug → RECOVERY mail with correct duration → GUI shows the incident → upgrade preserves DB → uninstall removes the service |
 | Rollups & retention | `internal/rollup`: a finished day is aggregated and today is not; downtime comes from incidents clipped to the day, including an outage that spans midnight; raw rows are pruned in chunks while their summaries survive; rollups and resolved incidents age out but an open incident never does; a day already past the rollup window is skipped rather than aggregated and immediately deleted |
 | Alert collapsing | `internal/core`: a whole site failing produces exactly one digest naming every member, and one on recovery; two devices still get their own mails; the hourly cap pauses mail, says so once, and leaves every incident recorded |
 | Soak | `TestSoak`: 50 devices in 6 groups, ~1 400 probes, then a restart, then a janitor pass — asserts no heartbeat is lost, history survives pruning as summaries, and goroutines return to baseline after two full lifecycles. The **seven-day** soak stays manual: only wall-clock time shows a slow leak |
@@ -781,7 +784,7 @@ Each phase ends on something demonstrable. Estimates are focused dev-days.
 | 3a | ✅ UI (browser) | Vite/React/Tailwind, grouped + flat dashboard, group manager, bulk move, device modal with inheritance placeholders, detail + uPlot + uptime strip, settings | Full UI working in Chrome on macOS against `-dev` | 3.75 |
 | 3b | ✅ Tauri shell | install `rustup`, Tauri v2 init, tray, single-instance, autostart, CSP, service-down banner | `npm run tauri dev` runs the same UI natively | 1 |
 | 4 | ✅ Rollups & hardening | janitor, retention, DPAPI secrets, rate limit + **group-scoped digest**, restart recovery, graceful shutdown | 7-day soak with 50 fake devices across 6 groups: flat memory, DB bounded, no lost heartbeats across restarts, a simulated site outage produces one digest | 1.75 |
-| 5 | Windows service + installer | `svcrun`, subcommands, Event Log, `setup.iss`, `release.yml` | Tagged build yields a signed `Setup.exe` that installs, starts and survives reboot on a clean Windows 11 VM | 2 |
+| 5 | 🔨 Windows service + installer | `svcrun`, subcommands, Event Log, `setup.iss`, `release.yml` | Tagged build yields a `Setup.exe` that installs, starts and survives reboot on a clean Windows 11 VM. **Built and compiling; the install/reboot run is outstanding** — see §16 q1 | 2 |
 | 6 | Acceptance & docs | manual checklist, README, troubleshooting, log/DB locations | Checklist in §12 passes end to end; v1.0.0 released | 1 |
 
 **~15.5 days**, of which grouping accounts for about 1.5 — a quarter-day of schema and
@@ -834,6 +837,9 @@ Places where the implementation departs from this plan, all deliberate:
 | Collapse window unstated; §7 describes a 120 s grouping window | `alert.collapse_sec`, default **15 s**, with a 120 s ceiling | Collapsing cannot be done without waiting, and the wait is added to every alert — so the default is the smallest window that still catches a site failing together, not the widest. Two things keep the cost down: a group whose every member has already failed flushes immediately, since nothing more can arrive; and 0 restores immediate per-device mail. §12's acceptance figure moves from ~90 s to ~105 s because of this, which is the honest accounting |
 | Mail rate limit, behaviour unspecified | At the cap, one notice goes out saying mail is paused, and the rest is withheld | The alternative is dropping alerts silently, and mail that stops without explanation reads as "all clear" — the exact failure this system exists to prevent. Nothing is lost either way: the incidents are in the database and on the dashboard, and only email is capped. The count comes from the outbox rather than memory, so a restart cannot be used to reset the budget |
 | Janitor prunes on a schedule | Also skips aggregating days already past the rollup window, and never touches today | Writing a summary that the same pass then deletes is pure waste — and a service that has been off longer than the retention window would do it hundreds of times. Today is excluded because a half-finished day would be frozen as the whole day's numbers and never revisited |
+| Installer detects a running GUI with `AppMutex` | `CloseApplications=yes` and the Restart Manager | The shell's single-instance mutex is named by Tauri from the app identifier, so an `AppMutex` line would name something nothing creates and silently never match — the installer would fail on a locked file instead of asking. Restart Manager finds it by the lock itself |
+| Installer offers "start with Windows" for the GUI | Removed; the dashboard's own Service page does it | The installer runs elevated, so `{userstartup}` is the *administrator's* startup folder rather than the person who uses the machine — a shortcut that silently does nothing for them. Inno warns about exactly this. The service starts with the machine either way |
+| Event Log for start/stop failures | A `logx` sink at warning level and above, alongside the file | Only warnings and errors: an Info entry per probe would fill the Application log and make it useless for everyone else on the machine. A missing source — before `install` has run, and always off Windows — is not fatal, because the file sink is the one that matters |
 | Node version unstated | Node 24 LTS, pinned in CI and in `ui/package.json` engines | `jsdom` 30 requires ≥24.15, and pinning the major keeps a developer's machine and CI on one runtime. TypeScript is held at 6.0.3 rather than the current 7.x because `typescript-eslint` supports `<6.1` — type-aware linting is worth more here than being on the newest compiler |
 | `scheduler/effective.go` owns the resolution chain | `model/effective.go` (`model.Resolve`) | `state` and `notify` both need the resolved values; putting the type in `scheduler` would have made the state machine import the scheduler, which is backwards. `model` has no dependencies, so nothing gains one |
 | DPAPI secret sealing in Phase 4 | Built in Phase 1 (`internal/secret`) | The notifier needs the SMTP password to send anything, and there is no acceptable interim state where that password sits in the database as plaintext. Windows uses DPAPI at machine scope; elsewhere AES-GCM under a 0600 key file, so the dev loop is not plaintext either. **Exercised on Windows in Phase 2**: `PUT /api/settings` with a password stores `smtp.password_enc = dpapi:AQAAANCMnd8…` and `POST /api/settings/test-email` unseals it and reaches the SMTP dial, so both directions now have a real run behind them (still unverified under `LocalSystem`, which is Phase 5) |
@@ -897,10 +903,15 @@ transition just mutated.**
 
 ## 16. Open questions
 
-1. **Windows acceptance host** — VM, spare machine, or none? Blocks Phase 5 sign-off, nothing earlier.
+1. **Windows acceptance host** — VM, spare machine, or none? **Still open, and now the only thing
+   between Phase 5 and done.** The installer compiles and the service code is exercised by the
+   suite, but "installs, starts and survives reboot" cannot be claimed without running it, and
+   reboot survival in particular cannot be tested on a machine that is in use.
 2. **Device count** — sized for 200. If it is closer to 1 000, the writer becomes a real
    bottleneck and heartbeats should be downsampled at write time.
-3. **Code-signing certificate** — buy one, or ship unsigned and accept the SmartScreen warning?
+3. ~~**Code-signing certificate**~~ — **answered: ship unsigned.** Internal tool; the
+   SmartScreen warning is accepted and `SHA256SUMS` covers verification. The signing steps have
+   been removed from `release.yml` rather than left dormant, so the workflow says what it does.
 4. **Multi-machine later?** v1 is one machine. If several sites need monitoring, the split is
    agent (Go) + central server, which changes the API's trust model — worth knowing now.
 5. **Retention default** — 14 days raw. Longer if you ever need per-probe forensics beyond two weeks.

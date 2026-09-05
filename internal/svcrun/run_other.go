@@ -15,6 +15,11 @@ import (
 	"github.com/gkgraphite/device-status-monitor/internal/core"
 )
 
+// ServiceName matches the Windows build so callers can name the service — for
+// an Event Log source, a log line, or an error message — without a build tag of
+// their own. Nothing off Windows acts on it.
+const ServiceName = "LocalMonitorSvc"
+
 // ErrNotSupported is returned by the service-management commands off Windows.
 var ErrNotSupported = errors.New("service management is only available on Windows")
 
