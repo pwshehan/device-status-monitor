@@ -4,7 +4,9 @@
 # Inno Setup installer do not: those are built on a windows-latest CI runner.
 
 MODULE  := github.com/pwshehan/device-status-monitor
-VERSION ?= dev
+# The single source of truth for the release version. The release workflow
+# refuses to build unless the tag agrees with this file.
+VERSION ?= $(strip $(shell cat VERSION))
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DIST    := dist
 

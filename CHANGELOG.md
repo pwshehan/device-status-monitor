@@ -1,11 +1,16 @@
 # Changelog
 
-## Unreleased — 1.0.0 candidate
+## 1.0.0
 
-Everything below is built and tested. **One thing stands between this and a
-1.0.0 tag**: the install-and-reboot acceptance run in
+Everything below is built and tested. **One thing stands between this and the
+tag**: the install-and-reboot acceptance run in
 [installer/ACCEPTANCE.md](installer/ACCEPTANCE.md), which needs a Windows
 machine to install on and cannot be claimed without doing it.
+
+The version in the root [VERSION](VERSION) file is what this release is. The
+release workflow refuses to build a tag that disagrees with it, refuses a
+version with no section in this file, and refuses to publish over a tag that
+already exists.
 
 ### Monitoring
 
@@ -92,6 +97,12 @@ machine to install on and cannot be claimed without doing it.
   the history on uninstall unless told otherwise.
 - Binaries in Program Files, data in ProgramData — an upgrade never touches the
   database, and migrations run on start.
+- **In-app updates.** The service checks the releases page every six hours,
+  downloads the installer and checks it against the published `SHA256SUMS`, and
+  then waits. Nothing installs itself: the dashboard offers an Install button
+  and applying it is a decision someone makes. It can be turned off entirely,
+  and a machine with no internet is unaffected — a failed check is a log line,
+  never an alert.
 
 ### Known limitations
 
