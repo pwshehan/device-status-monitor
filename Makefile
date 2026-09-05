@@ -6,7 +6,7 @@
 MODULE  := github.com/pwshehan/device-status-monitor
 # The single source of truth for the release version. The release workflow
 # refuses to build unless the tag agrees with this file.
-VERSION ?= $(strip $(shell cat VERSION))
+VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DIST    := dist
 
