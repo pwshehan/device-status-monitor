@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // Defaults for a pass. Every one of them is deliberately unexciting: the

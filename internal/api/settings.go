@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gkgraphite/device-status-monitor/internal/notify"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/notify"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // settingsResponse is the settings form's shape.

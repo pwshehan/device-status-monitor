@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sys/windows/svc/eventlog"
 	"golang.org/x/sys/windows/svc/mgr"
 
-	"github.com/gkgraphite/device-status-monitor/internal/core"
+	"github.com/pwshehan/device-status-monitor/internal/core"
 )
 
 // ServiceName and ServiceDisplay identify the service to the SCM.

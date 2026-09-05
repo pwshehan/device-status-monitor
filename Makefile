@@ -3,7 +3,7 @@
 # The Go engine cross-compiles to Windows from any host. The Tauri GUI and the
 # Inno Setup installer do not: those are built on a windows-latest CI runner.
 
-MODULE  := github.com/gkgraphite/device-status-monitor
+MODULE  := github.com/pwshehan/device-status-monitor
 VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DIST    := dist

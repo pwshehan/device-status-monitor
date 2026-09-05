@@ -10,15 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/api"
-	"github.com/gkgraphite/device-status-monitor/internal/appdir"
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/notify"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
-	"github.com/gkgraphite/device-status-monitor/internal/rollup"
-	"github.com/gkgraphite/device-status-monitor/internal/scheduler"
-	"github.com/gkgraphite/device-status-monitor/internal/state"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/api"
+	"github.com/pwshehan/device-status-monitor/internal/appdir"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/notify"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/rollup"
+	"github.com/pwshehan/device-status-monitor/internal/scheduler"
+	"github.com/pwshehan/device-status-monitor/internal/state"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // Options configures a run.

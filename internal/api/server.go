@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // DefaultAddr is the loopback address the service listens on. Never 0.0.0.0:

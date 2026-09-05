@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/model"
 )
 
 // Settings keys. The default.* tier is the bottom of the effective-value chain.

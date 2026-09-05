@@ -44,7 +44,7 @@ This is the biggest practical constraint and the source document does not cover 
    service install, SYSTEM-account behaviour and SmartScreen cannot be verified in CI.
 
 **Assumptions**, correct me if wrong:
-- Go module path `github.com/gkgraphite/device-status-monitor`
+- Go module path `github.com/pwshehan/device-status-monitor`
 - Scale target: up to 200 devices, default 30 s interval (~576k heartbeats/day worst case — the
   retention design in §5 is sized for this)
 - Devices are organised into **flat groups** — one group per device, no nesting (§3.1)

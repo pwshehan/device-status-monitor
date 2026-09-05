@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
 )
 
 // DefaultMaxConcurrent caps simultaneous dials. Per-device intervals are the
