@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -408,5 +409,30 @@ func TestSkipsDaysOlderThanTheRollupWindow(t *testing.T) {
 	}
 	if len(old) != 0 {
 		t.Errorf("%d rows from 90 days ago survived pruning", len(old))
+	}
+}
+
+func TestConcurrentOnceAndLastPass(t *testing.T) {
+	ctx := context.Background()
+	st := open(t)
+	d := device(t, st, "switch", "10.0.0.1")
+	seedDay(t, st, d.ID, 2, 10, 0)
+
+	j := &Janitor{Store: st, Log: quiet()}
+
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = j.Once(ctx)
+			_, _ = j.LastPass()
+		}()
+	}
+	wg.Wait()
+
+	at, _ := j.LastPass()
+	if at.IsZero() {
+		t.Fatal("last pass timestamp was not recorded")
 	}
 }
