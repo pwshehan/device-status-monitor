@@ -55,6 +55,13 @@ func (d Dirs) DB() string { return filepath.Join(d.Root, "monitor.db") }
 // TokenFile is where the local API's bearer token is stored.
 func (d Dirs) TokenFile() string { return filepath.Join(d.Root, "api.token") }
 
+// UpdateDir is where a downloaded installer is staged before it is run.
+//
+// It is created separately from the directories below, with a restrictive ACL:
+// the service runs as LocalSystem, and a directory it executes from must not be
+// one a standard user can write to. See internal/update.
+func (d Dirs) UpdateDir() string { return filepath.Join(d.Root, "updates") }
+
 // LogDir is the rotating log directory.
 func (d Dirs) LogDir() string { return filepath.Join(d.Root, "logs") }
 
