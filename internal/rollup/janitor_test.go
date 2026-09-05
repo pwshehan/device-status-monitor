@@ -436,3 +436,34 @@ func TestConcurrentOnceAndLastPass(t *testing.T) {
 		t.Fatal("last pass timestamp was not recorded")
 	}
 }
+
+func TestLastPassDoesNotBlockOnInFlightOnce(t *testing.T) {
+	ctx := context.Background()
+	st := open(t)
+	d := device(t, st, "switch", "10.0.0.1")
+	seedDay(t, st, d.ID, 2, 10, 0)
+
+	j := &Janitor{Store: st, Log: quiet()}
+	j.passMu.Lock()
+
+	onceDone := make(chan struct{})
+	go func() {
+		defer close(onceDone)
+		_ = j.Once(ctx)
+	}()
+
+	lastPassDone := make(chan struct{})
+	go func() {
+		defer close(lastPassDone)
+		_, _ = j.LastPass()
+	}()
+
+	select {
+	case <-lastPassDone:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("LastPass blocked on an in-flight Once")
+	}
+
+	j.passMu.Unlock()
+	<-onceDone
+}
