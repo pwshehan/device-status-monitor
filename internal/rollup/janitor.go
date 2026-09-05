@@ -48,7 +48,8 @@ type Janitor struct {
 	// waiting for a real day to end.
 	Now func() time.Time
 
-	mu         sync.Mutex
+	passMu     sync.Mutex
+	statusMu   sync.RWMutex
 	lastVacuum time.Time
 	lastPass   time.Time
 	lastResult Result
@@ -94,8 +95,8 @@ func (j *Janitor) Run(ctx context.Context) {
 // Once runs a single pass. Exported so a test — or a future maintenance
 // subcommand — can do the work without waiting on a ticker.
 func (j *Janitor) Once(ctx context.Context) Result {
-	j.mu.Lock()
-	defer j.mu.Unlock()
+	j.passMu.Lock()
+	defer j.passMu.Unlock()
 
 	now := j.now()
 	res := Result{At: now}
@@ -165,8 +166,10 @@ func (j *Janitor) Once(ctx context.Context) Result {
 			"rollup_days", retention.RollupDays)
 	}
 
+	j.statusMu.Lock()
 	j.lastPass = now
 	j.lastResult = res
+	j.statusMu.Unlock()
 	return res
 }
 
@@ -252,8 +255,8 @@ func (j *Janitor) maybeVacuum(ctx context.Context, now time.Time) bool {
 
 // LastPass reports what the most recent pass did, for /api/health.
 func (j *Janitor) LastPass() (time.Time, Result) {
-	j.mu.Lock()
-	defer j.mu.Unlock()
+	j.statusMu.RLock()
+	defer j.statusMu.RUnlock()
 	return j.lastPass, j.lastResult
 }
 
