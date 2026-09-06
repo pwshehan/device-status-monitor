@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/model"
 )
 
 // Counts is the dashboard's top row.

@@ -33,7 +33,7 @@ This is the biggest practical constraint and the source document does not cover 
    - `internal/svcrun/run_windows.go` — `golang.org/x/sys/windows/svc`
    - `internal/svcrun/run_other.go` — foreground runner, so `go run ./cmd/monitor-service -dev` works on macOS
 2. The React UI is developed in a **plain browser** via `npm run dev` against the Go service
-   on `127.0.0.1:49215`. No Rust toolchain needed for 90% of UI work.
+   on `127.0.0.1:39215`. No Rust toolchain needed for 90% of UI work.
 3. Rust/Tauri is only needed for the native shell (tray icon, single-instance, autostart,
    window chrome) and the final binary. Installed in Phase 3b: `rustup` with the
    `stable-x86_64-pc-windows-msvc` toolchain. The heavy prerequisite — Visual Studio Build
@@ -44,7 +44,7 @@ This is the biggest practical constraint and the source document does not cover 
    service install, SYSTEM-account behaviour and SmartScreen cannot be verified in CI.
 
 **Assumptions**, correct me if wrong:
-- Go module path `github.com/gkgraphite/device-status-monitor`
+- Go module path `github.com/pwshehan/device-status-monitor`
 - Scale target: up to 200 devices, default 30 s interval (~576k heartbeats/day worst case — the
   retention design in §5 is sized for this)
 - Devices are organised into **flat groups** — one group per device, no nesting (§3.1)
@@ -65,7 +65,7 @@ This is the biggest practical constraint and the source document does not cover 
 │  │  · single instance       │        │  │    per-device ticker  │  │
 │  │ ─────────────────────────│  HTTP  │  ├── prober (TCP dial)   │  │
 │  │ WebView2                 │◄──────►│  ├── evaluator          │  │
-│  │  React + Vite + Tailwind │ :49215 │  │    state machine     │  │
+│  │  React + Vite + Tailwind │ :39215 │  │    state machine     │  │
 │  │  TanStack Query + SSE    │ Bearer │  ├── writer (batched)    │  │
 │  │  uPlot                   │        │  ├── notifier (SMTP)    │  │
 │  └──────────────────────────┘        │  ├── janitor (rollup)   │  │
@@ -461,7 +461,7 @@ Steady state: ~600 MB raw at 14 days for 200 devices, plus a trivial rollup tabl
 
 ## 6. Local API
 
-`http.Server` bound to `127.0.0.1:49215` (loopback only — never `0.0.0.0`).
+`http.Server` bound to `127.0.0.1:39215` (loopback only — never `0.0.0.0`).
 
 ### Auth and hardening
 
@@ -473,7 +473,7 @@ DNS-rebinding against it. Three cheap layers:
    `C:\ProgramData\LocalMonitor\api.token` with a DACL granting `SYSTEM` + `Administrators`
    full control and `Users` read. The GUI reads the file and sends
    `Authorization: Bearer <token>`. Rotated on demand via `monitor-service.exe rotate-token`.
-2. **Origin/Host pinning.** Reject any request whose `Host` is not `127.0.0.1:49215` or whose
+2. **Origin/Host pinning.** Reject any request whose `Host` is not `127.0.0.1:39215` or whose
    `Origin` header is present and not `http://127.0.0.1:*` / `tauri://localhost`. Kills
    DNS-rebinding.
 3. **RemoteAddr check.** Reject anything not from `127.0.0.1`/`::1` even if the bind slipped.
@@ -618,7 +618,7 @@ group — a core switch outage should not send 60 emails.
 - Tray icon (Rust): show/hide, quit, and up/down count in the tooltip. Closing the window
   minimises to tray; quitting the GUI never touches the service.
 - Optional autostart via `tauri-plugin-autostart`; single-instance via `tauri-plugin-single-instance`.
-- Tauri CSP locked to `default-src 'self'; connect-src http://127.0.0.1:49215`.
+- Tauri CSP locked to `default-src 'self'; connect-src http://127.0.0.1:39215`.
 - Dark/light following the OS.
 
 ---
@@ -824,7 +824,7 @@ Places where the implementation departs from this plan, all deliberate:
 | Plan said | Built as | Why |
 |---|---|---|
 | `core.Start` starts the API (§10), and the layout puts handlers in `internal/api` | Same, but the dependency points **api ← core**: `api.Engine` is an interface (`Reload`, `CheckNow`, `Uptime`, `Running`, `SchedulerLagMS`, `SendTestEmail`, `SaveSMTPPassword`) that `*core.App` satisfies | The alternative is an import cycle. It also means the handlers test against a stub with no scheduler, database writer or clock — the API tests are fast and deterministic because of it |
-| Host pinned to `127.0.0.1:49215` exactly | Host pinned by **hostname** (`127.0.0.1`, `localhost`, `::1`), any port | The rebinding attack turns on the hostname — an attacker's page arrives carrying their DNS name. The port is configurable (`-api-addr`) and is whatever the OS handed out under `httptest`, so pinning it would only break the tests, not an attacker |
+| Host pinned to `127.0.0.1:39215` exactly | Host pinned by **hostname** (`127.0.0.1`, `localhost`, `::1`), any port | The rebinding attack turns on the hostname — an attacker's page arrives carrying their DNS name. The port is configurable (`-api-addr`) and is whatever the OS handed out under `httptest`, so pinning it would only break the tests, not an attacker |
 | Bearer token in the `Authorization` header | Same, with no query-parameter fallback | Which rules out the browser `EventSource` API for `/api/events`, since it cannot set headers — the UI reads the stream with `fetch()`. A token in a URL ends up in logs and history, and that is worse than one extra line of client code |
 | `heartbeats?max_points` returns decimated raw rows | Returns **buckets**: `{t, avg_latency_ms, max_latency_ms, checks, downs}`, decimated by SQLite | A 90-day window at 10 s is 777 000 rows for a chart that asked for a thousand points, so the thinning has to happen in SQL. Carrying max and a down count per bucket is what keeps a single 900 ms spike or a two-minute outage from being averaged into invisibility |
 | Uptime endpoints read `rollups_daily` | Read rollups **and** fill any day the janitor has not aggregated from raw heartbeats, tagging each day `source: rollup \| raw \| mixed` | The janitor is Phase 4, so without this every uptime strip is empty until then and Phase 3a has nothing to build against. `source` is what stops the UI reading a raw day as an authoritative one — and once rollups exist they win, so the endpoint does not change shape |
@@ -834,7 +834,7 @@ Places where the implementation departs from this plan, all deliberate:
 | UI reads the API directly in dev | Vite proxies `/api` and injects the bearer token from `.dev-data/api.token` | A browser cannot read the token file, so the alternative is pasting a token into the app after every `rotate-token`. Proxying also makes the dev loop same-origin, so it does not depend on the CORS path above. The UI keeps its own token handling for the Tauri shell and for a browser pointed straight at the service |
 | The GUI window declared in `tauri.conf.json` | Built in `setup()` with `WebviewWindowBuilder` | A statically-declared window cannot carry an `initialization_script`, and the API token has to be in the page *before* its bundle evaluates — the client reads `window.__MONITOR_TOKEN__` at module scope. Injecting it afterwards would flash the "not authorised" banner on every launch |
 | — | The tray tooltip is pushed from the page (`set_tray_status`), not polled by Rust | The window is already subscribed to the event stream, so a poller in the shell would double the load on the API to learn what the page knows already. The cost is that the tooltip stops updating if the webview dies — acceptable, because the tray is a convenience and the service is unaffected either way |
-| CSP `connect-src http://127.0.0.1:49215` | Same, plus `http://localhost:49215` | Both names resolve to the same loopback interface and either can end up in a URL; allowing only one turns a working configuration into a blank screen with a console error. The origin allowlist on the service side is the check that actually matters |
+| CSP `connect-src http://127.0.0.1:39215` | Same, plus `http://localhost:39215` | Both names resolve to the same loopback interface and either can end up in a URL; allowing only one turns a working configuration into a blank screen with a console error. The origin allowlist on the service side is the check that actually matters |
 | Autostart, unqualified | Autostart applies to the *window* only, and the UI says so | The service already starts with the machine, signed in or not. Without the distinction on screen, unticking the box reads as "stop monitoring at boot", which would be the opposite of what it does |
 | Collapse window unstated; §7 describes a 120 s grouping window | `alert.collapse_sec`, default **15 s**, with a 120 s ceiling | Collapsing cannot be done without waiting, and the wait is added to every alert — so the default is the smallest window that still catches a site failing together, not the widest. Two things keep the cost down: a group whose every member has already failed flushes immediately, since nothing more can arrive; and 0 restores immediate per-device mail. §12's acceptance figure moves from ~90 s to ~105 s because of this, which is the honest accounting |
 | Mail rate limit, behaviour unspecified | At the cap, one notice goes out saying mail is paused, and the rest is withheld | The alternative is dropping alerts silently, and mail that stops without explanation reads as "all clear" — the exact failure this system exists to prevent. Nothing is lost either way: the incidents are in the database and on the dashboard, and only email is capped. The count comes from the outbox rather than memory, so a restart cannot be used to reset the budget |

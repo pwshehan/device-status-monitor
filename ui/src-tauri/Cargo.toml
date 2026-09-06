@@ -2,7 +2,7 @@
 name = "local-monitor-gui"
 version = "0.1.0"
 description = "Local Monitor desktop shell"
-authors = ["GK Graphite"]
+authors = ["Shein.Engineer"]
 edition = "2021"
 rust-version = "1.77"
 

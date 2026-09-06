@@ -3,19 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Local Device Monitor \u2014 dashboard for the loopback API on 127.0.0.1:49215",
+  "description": "Local Device Monitor \u2014 dashboard for the loopback API on 127.0.0.1:39215",
   "engines": {
     "node": ">=24.15.0"
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc -b --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:tauri": "tsc --noEmit && vite build --mode tauri",
+    "build:tauri": "tsc -b --noEmit && vite build --mode tauri",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

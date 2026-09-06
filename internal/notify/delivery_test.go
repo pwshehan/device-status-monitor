@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // cancellingSender delivers the mail and then cancels the context, standing in

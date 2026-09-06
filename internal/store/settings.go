@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/model"
 )
 
 // Settings keys. The default.* tier is the bottom of the effective-value chain.
@@ -38,6 +38,31 @@ const (
 
 	KeyRetentionRawDays    = "retention.raw_days"
 	KeyRetentionRollupDays = "retention.rollup_days"
+
+	// The two the operator sets.
+	KeyUpdatesEnabled      = "updates.enabled"
+	KeyUpdatesAutoDownload = "updates.auto_download"
+
+	// The rest is the update checker's own state. It lives here rather than in
+	// a table of its own because it is a handful of scalars that have to
+	// survive a restart, which is exactly what this table is for.
+	//
+	// UpdatesReadySHA256 is the load-bearing one: it is what the staged
+	// installer is re-checked against immediately before the service runs it.
+	KeyUpdatesLatest      = "updates.latest"
+	KeyUpdatesETag        = "updates.etag"
+	KeyUpdatesLastChecked = "updates.last_checked"
+	KeyUpdatesNotesURL    = "updates.notes_url"
+	KeyUpdatesPublishedAt = "updates.published_at"
+	KeyUpdatesReadyVer    = "updates.ready_version"
+	KeyUpdatesReadySHA256 = "updates.ready_sha256"
+	KeyUpdatesError       = "updates.error"
+
+	// Set when an install is launched and cleared when the next start sees a
+	// new version. Still set at startup means the installer ran and the
+	// version did not change, which is the only evidence a silent install
+	// failed that anyone would otherwise have to go looking for.
+	KeyUpdatesInstallAt = "updates.install_at"
 )
 
 // seedDefaults are written on first start and never overwritten.
@@ -53,6 +78,8 @@ var seedDefaults = map[string]string{
 	KeyDefaultRecoveryThreshold: "1",
 	KeyRetentionRawDays:         "14",
 	KeyRetentionRollupDays:      "400",
+	KeyUpdatesEnabled:           "1",
+	KeyUpdatesAutoDownload:      "1",
 }
 
 // SeedSettings inserts any missing default setting, leaving existing values
@@ -189,6 +216,46 @@ func (s *Store) AlertPolicy(ctx context.Context) (AlertPolicy, error) {
 		CollapseWindow: time.Duration(atoiOrZero(all[KeyAlertCollapseSec], 15)) * time.Second,
 		MaxPerHour:     atoiOrZero(all[KeyAlertMaxPerHour], 20),
 	}, nil
+}
+
+// UpdatePolicy is what the operator has said about updates.
+type UpdatePolicy struct {
+	// Enabled is whether to contact GitHub at all. Off means the service never
+	// makes an outbound request, which is the setting for a machine that is not
+	// supposed to.
+	Enabled bool
+
+	// AutoDownload stages a new installer as soon as one is found. It never
+	// runs it — applying an update is always a decision someone makes.
+	AutoDownload bool
+}
+
+// UpdatePolicy reads the two update settings.
+//
+// Both default to on when unset or malformed, matching the seeded values: a
+// typo in one of them should leave the service telling people about updates,
+// not quietly stop.
+func (s *Store) UpdatePolicy(ctx context.Context) (UpdatePolicy, error) {
+	all, err := s.AllSettings(ctx)
+	if err != nil {
+		return UpdatePolicy{Enabled: true, AutoDownload: true}, err
+	}
+	return UpdatePolicy{
+		Enabled:      boolOr(all[KeyUpdatesEnabled], true),
+		AutoDownload: boolOr(all[KeyUpdatesAutoDownload], true),
+	}, nil
+}
+
+// boolOr reads the "1"/"0" the settings table stores for a flag.
+func boolOr(s string, fallback bool) bool {
+	switch s {
+	case "1", "true":
+		return true
+	case "0", "false":
+		return false
+	default:
+		return fallback
+	}
 }
 
 // AlertsSentSince counts mail queued in a window, for the rate limit.

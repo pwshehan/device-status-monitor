@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/api"
-	"github.com/gkgraphite/device-status-monitor/internal/appdir"
-	"github.com/gkgraphite/device-status-monitor/internal/core"
-	"github.com/gkgraphite/device-status-monitor/internal/logx"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
-	"github.com/gkgraphite/device-status-monitor/internal/svcrun"
+	"github.com/pwshehan/device-status-monitor/internal/api"
+	"github.com/pwshehan/device-status-monitor/internal/appdir"
+	"github.com/pwshehan/device-status-monitor/internal/core"
+	"github.com/pwshehan/device-status-monitor/internal/logx"
+	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/svcrun"
 )
 
 // version is stamped at build time: -ldflags "-X main.version=1.0.0".
@@ -36,7 +36,7 @@ Flags:
   -dev            run in the foreground against ./.dev-data
   -seed           create example groups and devices if the database is empty
   -log-level      debug | info | warn | error (default info)
-  -api-addr       loopback address for the local API (default 127.0.0.1:49215)
+  -api-addr       loopback address for the local API (default 127.0.0.1:39215)
 `
 
 func main() {

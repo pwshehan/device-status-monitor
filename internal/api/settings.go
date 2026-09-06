@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gkgraphite/device-status-monitor/internal/notify"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/notify"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // settingsResponse is the settings form's shape.
@@ -46,6 +46,11 @@ type settingsResponse struct {
 		RawDays    int `json:"raw_days"`
 		RollupDays int `json:"rollup_days"`
 	} `json:"retention"`
+
+	Updates struct {
+		Enabled      bool `json:"enabled"`
+		AutoDownload bool `json:"auto_download"`
+	} `json:"updates"`
 }
 
 // redacted is what the password field always contains on the way out.
@@ -82,6 +87,9 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	res.Retention.RawDays = atoiOr(all[store.KeyRetentionRawDays], 14)
 	res.Retention.RollupDays = atoiOr(all[store.KeyRetentionRollupDays], 400)
 
+	res.Updates.Enabled = boolOr(all[store.KeyUpdatesEnabled], true)
+	res.Updates.AutoDownload = boolOr(all[store.KeyUpdatesAutoDownload], true)
+
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -115,6 +123,11 @@ type settingsBody struct {
 		RawDays    Opt[int] `json:"raw_days"`
 		RollupDays Opt[int] `json:"rollup_days"`
 	} `json:"retention"`
+
+	Updates struct {
+		Enabled      Opt[bool] `json:"enabled"`
+		AutoDownload Opt[bool] `json:"auto_download"`
+	} `json:"updates"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -134,6 +147,13 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 			kv[key] = strconv.Itoa(o.Value)
 		}
 	}
+	// Flags are stored as "1"/"0" rather than "true"/"false" to match the rest
+	// of the table, which is all numbers as text.
+	putBool := func(key string, o Opt[bool]) {
+		if o.Set && o.Valid {
+			kv[key] = boolStr(o.Value)
+		}
+	}
 
 	putStr(store.KeySMTPHost, body.SMTP.Host)
 	putStr(store.KeySMTPUsername, body.SMTP.Username)
@@ -149,6 +169,8 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	putInt(store.KeyDefaultRecoveryThreshold, body.Defaults.RecoveryThreshold)
 	putInt(store.KeyRetentionRawDays, body.Retention.RawDays)
 	putInt(store.KeyRetentionRollupDays, body.Retention.RollupDays)
+	putBool(store.KeyUpdatesEnabled, body.Updates.Enabled)
+	putBool(store.KeyUpdatesAutoDownload, body.Updates.AutoDownload)
 
 	if body.SMTP.Security.Set {
 		mode := strings.ToLower(strings.TrimSpace(body.SMTP.Security.Value))
@@ -337,4 +359,25 @@ func orDefault(s, fallback string) string {
 		return fallback
 	}
 	return s
+}
+
+// boolOr and boolStr are the two halves of how a flag is stored: "1" or "0",
+// with anything unrecognised falling back rather than being read as false. A
+// malformed value must not silently turn a feature off.
+func boolOr(s string, fallback bool) bool {
+	switch s {
+	case "1", "true":
+		return true
+	case "0", "false":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
 }

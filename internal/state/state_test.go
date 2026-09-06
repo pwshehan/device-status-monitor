@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
 )
 
 var base = time.Date(2026, 9, 3, 10, 0, 0, 0, time.UTC)

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // The wire types live here rather than on the model, so a rename in the UI

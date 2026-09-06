@@ -3,7 +3,8 @@ import { resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig, type PluginOption, type ProxyOptions } from 'vite'
+import type { PluginOption, ProxyOptions } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 /**
  * The dev server proxies /api to the Go service and injects the bearer token
@@ -33,12 +34,12 @@ function readDevToken(): string | null {
 /**
  * Where the dev server forwards /api.
  *
- * Overridable because the installed service owns 49215 on a machine that has
+ * Overridable because the installed service owns 39215 on a machine that has
  * one, so developing against a second instance means running it on another
- * port: `monitor-service -dev -api-addr 127.0.0.1:49216` with
- * `MONITOR_API=http://127.0.0.1:49216 npm run dev`.
+ * port: `monitor-service -dev -api-addr 127.0.0.1:39216` with
+ * `MONITOR_API=http://127.0.0.1:39216 npm run dev`.
  */
-const API_TARGET = process.env.MONITOR_API ?? 'http://127.0.0.1:49215'
+const API_TARGET = process.env.MONITOR_API ?? 'http://127.0.0.1:39215'
 
 const apiProxy: ProxyOptions = {
   target: API_TARGET,
@@ -80,6 +81,12 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: { '/api': apiProxy },
+    // Nothing under src-tauri is frontend source, and target/ is where cargo
+    // rewrites a multi-megabyte DLL every time the shell rebuilds. Watching it
+    // does not just waste effort: `tauri dev` rebuilds while the dev server is
+    // running, and the watcher dies with EBUSY on the half-written file, taking
+    // the dev server down with it.
+    watch: { ignored: ['**/src-tauri/**'] },
   },
   build: {
     outDir: 'dist',

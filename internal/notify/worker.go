@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/secret"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/secret"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // Worker drains the durable outbox.

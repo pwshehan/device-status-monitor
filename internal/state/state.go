@@ -6,8 +6,8 @@ package state
 import (
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
 )
 
 // Snapshot is a device's live state as the evaluator holds it in memory. It is

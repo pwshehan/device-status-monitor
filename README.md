@@ -49,6 +49,30 @@ replaces the two executables and starts it again. Your history is not touched.
 **Uninstalling** removes the service and the programs, and *keeps* the history
 unless you chose otherwise during setup.
 
+### Updates
+
+The service checks the releases page every six hours. When it finds a newer
+version it downloads the installer, checks it against the `SHA256SUMS`
+published with that release, and then stops — the **Service** page offers an
+**Install now** button, and nothing happens until someone presses it.
+
+Installing stops the service for a few seconds and restarts it. Nothing is
+monitored during that gap, which is why the decision is yours and not the
+service's.
+
+Both halves can be turned off under **Settings → Updates**: checking at all,
+and downloading automatically. With checking off, the service makes no
+outbound request except to the devices it monitors and your mail server. A
+machine with no route to the internet needs no configuration either way — a
+failed check is a line in the log, never an alert, and it never disturbs an
+update already downloaded.
+
+What the checksum proves is worth being precise about. It travels alongside
+the installer it describes, so it is not evidence the release is genuine —
+TLS to GitHub is what that rests on. What it does prove is that the file on
+disk is the file GitHub served, and, because the hash is checked again in the
+moment before the installer runs, that what runs is what was checked.
+
 ---
 
 ## Using it
@@ -226,7 +250,7 @@ with the counter reset daily.
 
 ## The local API
 
-The service listens on `127.0.0.1:49215`. Loopback is not the security model —
+The service listens on `127.0.0.1:39215`. Loopback is not the security model —
 every local process can reach a loopback port — so there are three layers: a
 bearer token, `Host`/`Origin` pinning, and a loopback check on `RemoteAddr`.
 
@@ -238,22 +262,27 @@ service.
 ```bash
 TOKEN=$(cat "C:/ProgramData/LocalMonitor/api.token")
 
-curl -s localhost:49215/api/health | jq                       # no token needed
-curl -s -H "Authorization: Bearer $TOKEN" localhost:49215/api/summary | jq
+curl -s localhost:39215/api/health | jq                       # no token needed
+curl -s -H "Authorization: Bearer $TOKEN" localhost:39215/api/summary | jq
+
+# What this machine knows about the newest release. Behind the token: which
+# machines are behind on patches is not something to hand out unauthenticated.
+curl -s -H "Authorization: Bearer $TOKEN" localhost:39215/api/update | jq
+curl -s -X POST -H "Authorization: Bearer $TOKEN" localhost:39215/api/update/check | jq
 
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' localhost:49215/api/devices \
+  -H 'Content-Type: application/json' localhost:39215/api/devices \
   -d '{"name":"Core switch","ip_address":"10.0.0.1","port":22,"group_id":1}' | jq
 
 # Move devices between groups in one transaction and one scheduler reload
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' localhost:49215/api/devices/bulk \
+  -H 'Content-Type: application/json' localhost:39215/api/devices/bulk \
   -d '{"ids":[1,2,3],"op":"move","group_id":2}' | jq
 
 # Live transitions. curl, not EventSource: the stream needs the auth header,
 # which the browser EventSource API cannot set — the UI uses fetch().
 curl -N -H "Authorization: Bearer $TOKEN" \
-  'localhost:49215/api/events?types=device_status,incident'
+  'localhost:39215/api/events?types=device_status,incident'
 ```
 
 A nullable probe setting is `null` when the row inherits, and every response
@@ -305,8 +334,31 @@ cd ui && npm run tauri:dev
 ```
 
 ```bash
-make release-local VERSION=1.0.0
+make release-local
 ```
+
+### Cutting a release
+
+The root [VERSION](VERSION) file is what a release is. Everything else follows
+from it: the Makefile stamps it into the engine, and the release workflow
+refuses to build unless the tag agrees with it. The dashboard and the desktop
+shell carry their own component versions, which are not this one and are not
+expected to match it.
+
+To release: bump `VERSION`, retitle the `## Unreleased` section in
+[CHANGELOG.md](CHANGELOG.md) to that version, and push the tag.
+
+```bash
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+The job stops before it builds anything unless all four hold: the version
+parses the way the updater's parser reads it, the tag matches `VERSION` at
+that commit, `CHANGELOG.md` has a `## 1.0.1` section, and `v1.0.1` is not
+already published. The release notes are that CHANGELOG section, so what
+shipped and what was written down cannot drift apart.
+
+`make build VERSION=1.0.1-test` still overrides the file for a local build.
 
 Everything is covered by automated tests except what needs a real machine to
 install on — the service registering with the SCM, running as `LocalSystem`,

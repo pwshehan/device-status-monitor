@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
 )
 
 func eff(id int64, name string, interval time.Duration) model.Effective {

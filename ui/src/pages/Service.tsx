@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { apiToken, setApiToken } from '../api/client'
 import { useStream } from '../app/StreamContext'
+import { UpdateSection } from '../components/UpdateSection'
 import { Button, ErrorNote, Field, Spinner, Tile, inputClass } from '../components/ui'
 import { useHealth } from '../hooks/queries'
 import { bytes, duration, since } from '../lib/format'
@@ -36,6 +37,8 @@ export function Service() {
       </div>
 
       <ErrorNote error={health.error} />
+
+      <UpdateSection />
 
       {health.isPending ? (
         <Spinner label="Asking the service" />

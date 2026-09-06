@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/api"
-	"github.com/gkgraphite/device-status-monitor/internal/appdir"
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/notify"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/api"
+	"github.com/pwshehan/device-status-monitor/internal/appdir"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/notify"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // quietLog keeps test output readable; raise the level when debugging a failure.
@@ -155,7 +155,7 @@ func TestEngineEndToEnd(t *testing.T) {
 	sender := &capturingSender{}
 
 	app, err := Start(ctx, Options{
-		Dirs: dirs, Log: quietLog(),
+		Dirs: dirs, Log: quietLog(), UpdateInterval: -1,
 		Prober: prober, Sender: sender,
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,
@@ -272,7 +272,7 @@ func TestGroupRecipientsRouteTheAlert(t *testing.T) {
 	sender := &capturingSender{}
 
 	app, err := Start(ctx, Options{
-		Dirs: dirs, Log: quietLog(),
+		Dirs: dirs, Log: quietLog(), UpdateInterval: -1,
 		Prober: prober, Sender: sender,
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,
@@ -316,7 +316,7 @@ func TestGroupPauseSuppressesEverything(t *testing.T) {
 
 	sender := &capturingSender{}
 	app, err := Start(ctx, Options{
-		Dirs: dirs, Log: quietLog(),
+		Dirs: dirs, Log: quietLog(), UpdateInterval: -1,
 		Prober: &flakyProber{}, Sender: sender,
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,
@@ -374,7 +374,7 @@ func TestGroupIntervalChangeReloadsMembers(t *testing.T) {
 	prober.up.Store(true)
 
 	app, err := Start(ctx, Options{
-		Dirs: dirs, Log: quietLog(),
+		Dirs: dirs, Log: quietLog(), UpdateInterval: -1,
 		Prober: prober, Sender: &capturingSender{},
 		RefreshInterval:  10 * time.Second, // long, so only an explicit Reload counts
 		FlushInterval:    100 * time.Millisecond,
@@ -432,7 +432,7 @@ func TestRestartResumesWithoutRealerting(t *testing.T) {
 
 	opts := func(s notify.Sender) Options {
 		return Options{
-			Dirs: dirs, Log: quietLog(),
+			Dirs: dirs, Log: quietLog(), UpdateInterval: -1,
 			Prober: prober, Sender: s,
 			RefreshInterval:  200 * time.Millisecond,
 			FlushInterval:    100 * time.Millisecond,
@@ -506,7 +506,7 @@ func TestEnginePublishesTransitionsToTheHub(t *testing.T) {
 	prober.up.Store(true)
 
 	app, err := Start(ctx, Options{
-		Dirs: dirs, Log: quietLog(),
+		Dirs: dirs, Log: quietLog(), UpdateInterval: -1,
 		Prober: prober, Sender: &capturingSender{},
 		RefreshInterval:  200 * time.Millisecond,
 		FlushInterval:    100 * time.Millisecond,
@@ -606,7 +606,8 @@ func TestEngineServesTheAPI(t *testing.T) {
 	prober.up.Store(true)
 
 	app, err := Start(ctx, Options{
-		Dirs: dirs, Log: quietLog(), Version: "test",
+		UpdateInterval: -1,
+		Dirs:           dirs, Log: quietLog(), Version: "test",
 		// Port 0: the OS picks one, so a developer's running service does not
 		// make the test suite fail.
 		APIAddr: "127.0.0.1:0",

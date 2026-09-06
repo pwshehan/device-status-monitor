@@ -1,4 +1,4 @@
-module github.com/gkgraphite/device-status-monitor
+module github.com/pwshehan/device-status-monitor
 
 go 1.25.0
 

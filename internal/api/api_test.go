@@ -17,9 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/update"
 )
 
 // fakeEngine stands in for the running monitor: the handlers only need to know
@@ -35,6 +36,12 @@ type fakeEngine struct {
 	testErr  error
 	password string
 	pwSet    bool
+
+	upd        update.Status
+	upChecks   int
+	upDownload error
+	upInstall  error
+	installs   int
 }
 
 func (f *fakeEngine) Reload() {
@@ -90,6 +97,48 @@ func (f *fakeEngine) SaveSMTPPassword(ctx context.Context, plaintext string) err
 		sealed = "aesgcm:" + strings.Repeat("x", 32)
 	}
 	return st.PutSettings(ctx, map[string]string{store.KeySMTPPasswordEnc: sealed})
+}
+
+func (f *fakeEngine) UpdateStatus(context.Context) update.Status {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.upd
+}
+
+func (f *fakeEngine) CheckUpdate(context.Context) update.Status {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.upChecks++
+	return f.upd
+}
+
+func (f *fakeEngine) DownloadUpdate(context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.upDownload
+}
+
+func (f *fakeEngine) InstallUpdate(context.Context) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.upInstall != nil {
+		return f.upInstall
+	}
+	f.installs++
+	f.upd.State = update.StateInstalling
+	return nil
+}
+
+func (f *fakeEngine) setUpdate(s update.Status) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.upd = s
+}
+
+func (f *fakeEngine) installCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.installs
 }
 
 // env is one API under test: a real database, a stub engine, and a live
@@ -187,7 +236,7 @@ func (e *env) mustCall(method, path string, body, out any, want int) {
 func localRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
 	req.RemoteAddr = "127.0.0.1:54321"
-	req.Host = "127.0.0.1:49215"
+	req.Host = "127.0.0.1:39215"
 	return req
 }
 
@@ -295,11 +344,11 @@ func TestRebindingHostAndOriginAreRejected(t *testing.T) {
 		want   int
 	}{
 		{"attacker host", "monitor.attacker.example", "", http.StatusForbidden},
-		{"attacker origin", "127.0.0.1:49215", "https://attacker.example", http.StatusForbidden},
-		{"loopback host", "127.0.0.1:49215", "", http.StatusOK},
-		{"localhost host", "localhost:49215", "", http.StatusOK},
-		{"dev server origin", "127.0.0.1:49215", "http://localhost:5173", http.StatusOK},
-		{"tauri origin", "127.0.0.1:49215", "tauri://localhost", http.StatusOK},
+		{"attacker origin", "127.0.0.1:39215", "https://attacker.example", http.StatusForbidden},
+		{"loopback host", "127.0.0.1:39215", "", http.StatusOK},
+		{"localhost host", "localhost:39215", "", http.StatusOK},
+		{"dev server origin", "127.0.0.1:39215", "http://localhost:5173", http.StatusOK},
+		{"tauri origin", "127.0.0.1:39215", "tauri://localhost", http.StatusOK},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

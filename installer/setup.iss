@@ -17,7 +17,7 @@
 
 #define AppName        "Local Device Monitor"
 #define AppShortName   "LocalMonitor"
-#define Publisher      "GK Graphite"
+#define Publisher      "Shein.Engineer"
 #define ServiceExe     "monitor-service.exe"
 #define GuiExe         "monitor-gui.exe"
 #define ServiceName    "LocalMonitorSvc"
@@ -191,6 +191,12 @@ begin
   if not RegQueryDWordValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\{#Publisher}\{#AppShortName}',
       'KeepDataOnUninstall', Keep) then
     Keep := 1;
+
+  // A staged installer goes either way. "Keep the history" means the record of
+  // what was up and what was down; it does not mean a download the updater left
+  // behind, which is fifteen megabytes of no use to anyone once the thing it
+  // would have updated is gone.
+  DelTree(DataDir + '\updates', True, True, True);
 
   if Keep = 0 then
     DelTree(DataDir, True, True, True)

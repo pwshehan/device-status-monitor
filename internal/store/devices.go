@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/state"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/state"
 )
 
 const deviceCols = `id, name, ip_address, port, group_id,

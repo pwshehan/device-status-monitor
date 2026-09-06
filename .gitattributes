@@ -1,0 +1,5 @@
+# VERSION is read by the Makefile and by the release workflow's gate, and what
+# it holds is stamped into the binary. A CRLF checkout on Windows would put a
+# carriage return inside the version string, where it would survive as far as
+# the updater's semver parser before anything noticed.
+VERSION text eol=lf

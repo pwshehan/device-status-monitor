@@ -11,13 +11,33 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/update"
 )
 
 // DefaultAddr is the loopback address the service listens on. Never 0.0.0.0:
 // this API is a local control channel, not a network service.
-const DefaultAddr = "127.0.0.1:49215"
+//
+// The port is below 49152 on purpose, and raising it above that would bring
+// back a bug that is very hard to recognise from its symptom. 49152 and up is
+// the Windows ephemeral range, and anything using WinNAT — Hyper-V, WSL2,
+// Docker Desktop, Windows Sandbox — reserves blocks of it at boot, in
+// different places after each reboot. A service whose port lands inside a
+// reserved block cannot bind at all, and what Windows says about it is
+//
+//	bind: An attempt was made to access a socket in a way forbidden by its
+//	access permissions
+//
+// which reads like a permissions problem rather than a port problem. Since the
+// bind here doubles as the single-instance guard, that failure takes the whole
+// service down rather than just the API: an installed copy would run for months
+// and then refuse to start after an unrelated reboot.
+//
+// The current reservations are listed by:
+//
+//	netsh interface ipv4 show excludedportrange protocol=tcp
+const DefaultAddr = "127.0.0.1:39215"
 
 // Engine is what the handlers need from the running monitor.
 //
@@ -54,6 +74,21 @@ type Engine interface {
 	// SaveSMTPPassword seals a new password. The plaintext never reaches the
 	// database, and the API never returns it.
 	SaveSMTPPassword(ctx context.Context, plaintext string) error
+
+	// UpdateStatus is what the last check found and what has been staged.
+	UpdateStatus(ctx context.Context) update.Status
+
+	// CheckUpdate asks GitHub now instead of waiting for the next pass.
+	CheckUpdate(ctx context.Context) update.Status
+
+	// DownloadUpdate stages the installer for the newest known release. Only
+	// needed when automatic downloads are off.
+	DownloadUpdate(ctx context.Context) error
+
+	// InstallUpdate runs the staged installer and returns immediately. It
+	// returns before the installer starts, because the installer stops this
+	// service and nothing waiting past that point would ever be answered.
+	InstallUpdate(ctx context.Context) error
 }
 
 // JanitorStatus is the outcome of the last maintenance pass.
@@ -144,6 +179,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("PUT /api/settings", s.handlePutSettings)
 	mux.HandleFunc("POST /api/settings/test-email", s.handleTestEmail)
+
+	mux.HandleFunc("GET /api/update", s.handleUpdate)
+	mux.HandleFunc("POST /api/update/check", s.handleUpdateCheck)
+	mux.HandleFunc("POST /api/update/download", s.handleUpdateDownload)
+	mux.HandleFunc("POST /api/update/install", s.handleUpdateInstall)
 
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 

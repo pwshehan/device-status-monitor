@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // deviceBody is the create/update body. Every field is an Opt so a PATCH can

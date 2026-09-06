@@ -22,9 +22,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Work out the version
+      # The gate. A tag that disagrees with the tree is a typo, and a release
+      # with no notes is one nobody can read a year later. Both are cheaper to
+      # catch in the first ten seconds than after a Windows runner has spent
+      # ten minutes building the wrong thing.
+      - name: Gate the version
         id: version
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $version = if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $env:GITHUB_REF -replace '^refs/tags/v', ''
@@ -32,6 +38,33 @@ jobs:
             '${{ inputs.version }}'
           }
           if (-not $version) { throw 'no version to build' }
+
+          # The updater compares versions to decide whether to offer an
+          # upgrade, so a version its parser cannot read must never ship.
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+            throw "version '$version' is not a version the updater can parse"
+          }
+
+          # This is the gate proper. VERSION is read at the *tagged* commit, so
+          # the tag cannot claim a version the tree does not agree with.
+          $file = (Get-Content VERSION -Raw).Trim()
+          if ($file -ne $version) {
+            throw "the tag says $version but VERSION says $file"
+          }
+
+          if (-not (Select-String -Path CHANGELOG.md -Quiet `
+              -Pattern "^##\s+$([regex]::Escape($version))\s*$")) {
+            throw "CHANGELOG.md has no '## $version' section"
+          }
+
+          # Re-running a tag would replace what people have already downloaded
+          # while the checksums they were handed quietly stopped matching.
+          gh release view "v$version" 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { throw "v$version is already published" }
+          # gh's failure is the expected outcome here, but the step's implicit
+          # trailing `exit $LASTEXITCODE` would take it at face value.
+          $global:LASTEXITCODE = 0
+
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "building $version"
 
@@ -112,7 +145,10 @@ jobs:
         shell: pwsh
         run: |
           # So someone downloading an unsigned build has some way to check they
-          # got what was built.
+          # got what was built. The in-app updater reads this file too and
+          # refuses to run an installer whose hash does not appear in it, so
+          # both the "<lowercase hash>  <filename>" format and the presence of
+          # the setup exe are load-bearing.
           Get-ChildItem dist/*.exe | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           } | Out-File -Encoding ascii dist/SHA256SUMS
@@ -123,6 +159,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = '${{ steps.version.outputs.version }}'
+
+          # The notes are the CHANGELOG section the gate already insisted on,
+          # so what shipped and what was written down cannot drift apart.
+          $lines = Get-Content CHANGELOG.md
+          $found = $false
+          $body = New-Object System.Collections.Generic.List[string]
+          foreach ($line in $lines) {
+            if (-not $found) {
+              if ($line -match "^##\s+$([regex]::Escape($version))\s*$") { $found = $true }
+              continue
+            }
+            if ($line -match '^##\s') { break }
+            $body.Add($line)
+          }
+          if (-not $found) { throw "CHANGELOG.md has no '## $version' section" }
+
           $signed = 'Unsigned by design (internal tool) - SmartScreen will warn on first run. ' +
             'Check the download against SHA256SUMS.'
 
@@ -130,12 +182,17 @@ jobs:
           # here-string needs its closing marker at column zero, which cannot
           # happen inside an indented YAML block.
           $notes = @(
-            "Local Device Monitor $version",
+            ($body -join "`n").Trim(),
+            '',
+            '---',
             '',
             $signed,
             '',
             "**Install:** run ``LocalMonitor-Setup-$version.exe`` as an administrator. It registers",
             'the `LocalMonitorSvc` service, starts it, and puts the dashboard in the Start Menu.',
+            '',
+            'An existing install can take this update from its own Service page instead. The',
+            'service checks the download against `SHA256SUMS` before it will run it.',
             '',
             'Monitoring history lives in `C:\ProgramData\LocalMonitor` and is never touched by an',
             'upgrade. Uninstalling keeps it unless you choose otherwise.'

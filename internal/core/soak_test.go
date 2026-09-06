@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/store"
 )
 
 // TestSoak is §13's phase-4 acceptance check, compressed.
@@ -105,7 +105,7 @@ func TestSoak(t *testing.T) {
 
 	opts := func() Options {
 		return Options{
-			Dirs: dataDirs, Log: quietLog(),
+			Dirs: dataDirs, Log: quietLog(), UpdateInterval: -1,
 			Prober: counting, Sender: &capturingSender{},
 			MaxConcurrent:    16,
 			RefreshInterval:  500 * time.Millisecond,

@@ -3,8 +3,10 @@
 # The Go engine cross-compiles to Windows from any host. The Tauri GUI and the
 # Inno Setup installer do not: those are built on a windows-latest CI runner.
 
-MODULE  := github.com/gkgraphite/device-status-monitor
-VERSION ?= dev
+MODULE  := github.com/pwshehan/device-status-monitor
+# The single source of truth for the release version. The release workflow
+# refuses to build unless the tag agrees with this file.
+VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 DIST    := dist
 
@@ -50,7 +52,7 @@ tidy: ## Tidy go.mod
 ui-install: ## Install the UI's dependencies
 	cd ui && npm ci
 
-ui-dev: ## Run the UI dev server against the running service on :49215
+ui-dev: ## Run the UI dev server against the running service on :39215
 	cd ui && npm run dev
 
 ui-build: ## Type-check and build the UI into ui/dist

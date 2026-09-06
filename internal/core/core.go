@@ -10,15 +10,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gkgraphite/device-status-monitor/internal/api"
-	"github.com/gkgraphite/device-status-monitor/internal/appdir"
-	"github.com/gkgraphite/device-status-monitor/internal/model"
-	"github.com/gkgraphite/device-status-monitor/internal/notify"
-	"github.com/gkgraphite/device-status-monitor/internal/probe"
-	"github.com/gkgraphite/device-status-monitor/internal/rollup"
-	"github.com/gkgraphite/device-status-monitor/internal/scheduler"
-	"github.com/gkgraphite/device-status-monitor/internal/state"
-	"github.com/gkgraphite/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/api"
+	"github.com/pwshehan/device-status-monitor/internal/appdir"
+	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/device-status-monitor/internal/notify"
+	"github.com/pwshehan/device-status-monitor/internal/probe"
+	"github.com/pwshehan/device-status-monitor/internal/rollup"
+	"github.com/pwshehan/device-status-monitor/internal/scheduler"
+	"github.com/pwshehan/device-status-monitor/internal/state"
+	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/device-status-monitor/internal/update"
 )
 
 // Options configures a run.
@@ -48,6 +49,20 @@ type Options struct {
 	// JanitorInterval is how often history is aggregated and pruned. Hourly
 	// in production; tests drive a pass directly instead.
 	JanitorInterval time.Duration
+
+	// UpdateInterval is how often GitHub is asked about new releases. Zero
+	// takes the checker's default; negative disables the checker entirely,
+	// which is what the engine tests want — a test suite has no business making
+	// outbound requests, and one that did would be flaky on a machine with no
+	// network before it was anything else.
+	UpdateInterval time.Duration
+
+	// UpdateBaseURL points the update checker at something other than
+	// api.github.com. Injectable for the same reason Prober and Sender are,
+	// and for nothing else: there is no flag and no setting for it, because
+	// "where does this machine take its updates from" is not a question a
+	// monitoring tool should let anyone answer at runtime.
+	UpdateBaseURL string
 
 	// Prober and Sender are injectable for tests.
 	Prober probe.Prober
@@ -84,6 +99,7 @@ type App struct {
 	Scheduler *scheduler.Scheduler
 	Notifier  *notify.Worker
 	Janitor   *rollup.Janitor
+	Updater   *update.Checker
 	API       *api.Server
 	Hub       *api.Hub
 
@@ -169,6 +185,16 @@ func Start(parent context.Context, o Options) (*App, error) {
 		Interval: o.JanitorInterval,
 		Log:      o.Log,
 	}
+	if o.UpdateInterval >= 0 {
+		a.Updater = &update.Checker{
+			Store:    st,
+			Dirs:     o.Dirs,
+			Current:  o.Version,
+			Interval: o.UpdateInterval,
+			BaseURL:  o.UpdateBaseURL,
+			Log:      o.Log,
+		}
+	}
 
 	if err := a.refresh(ctx); err != nil {
 		cancel()
@@ -189,6 +215,9 @@ func Start(parent context.Context, o Options) (*App, error) {
 	a.spawn(func() { a.runRefresh(ctx) })
 	a.spawn(func() { a.Notifier.Run(ctx) })
 	a.spawn(func() { a.Janitor.Run(ctx) })
+	if a.Updater != nil {
+		a.spawn(func() { a.Updater.Run(ctx) })
+	}
 
 	o.Log.Info("engine started",
 		"db", o.Dirs.DB(), "devices", a.Scheduler.Running(), "dev", o.Dirs.Dev)

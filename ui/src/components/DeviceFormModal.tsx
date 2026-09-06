@@ -84,7 +84,7 @@ export function DeviceFormModal({ device, groups, defaults, onClose }: Props) {
    * while Warehouse is selected and overrides it to 15 would be a lie about
    * what saving is going to do.
    */
-  const placeholder = (key: SourceKey, field: (typeof overrideFields)[number]['body']): string => {
+  const placeholder = (_key: SourceKey, field: (typeof overrideFields)[number]['body']): string => {
     const fromGroup = selectedGroup?.[field] ?? null
     if (fromGroup !== null && selectedGroup !== null) {
       return `${fromGroup} (from ${selectedGroup.name})`
