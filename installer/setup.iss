@@ -17,7 +17,7 @@
 
 #define AppName        "Local Device Monitor"
 #define AppShortName   "LocalMonitor"
-#define Publisher      "GK Graphite"
+#define Publisher      "Shein.Engineer"
 #define ServiceExe     "monitor-service.exe"
 #define GuiExe         "monitor-gui.exe"
 #define ServiceName    "LocalMonitorSvc"
