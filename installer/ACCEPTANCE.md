@@ -138,6 +138,8 @@ Uninstall from Settings → Apps.
 - [ ] `C:\ProgramData\LocalMonitor\` **is still there**, and a message said so —
       the history outliving the software is the intended behaviour
 - [ ] Reinstalling picks the existing database back up
+- [ ] After a §6a run, `C:\ProgramData\LocalMonitor\updates` is gone even when
+      the history was kept — a staged installer is not history
 
 ---
 
