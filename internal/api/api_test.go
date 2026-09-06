@@ -99,7 +99,7 @@ func (f *fakeEngine) SaveSMTPPassword(ctx context.Context, plaintext string) err
 	return st.PutSettings(ctx, map[string]string{store.KeySMTPPasswordEnc: sealed})
 }
 
-func (f *fakeEngine) UpdateStatus() update.Status {
+func (f *fakeEngine) UpdateStatus(context.Context) update.Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.upd

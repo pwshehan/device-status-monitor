@@ -261,7 +261,7 @@ func TestASecondCheckCostsAConditionalRequest(t *testing.T) {
 	c := newChecker(t, g, "1.0.0")
 
 	c.Once(ctx)
-	before := c.Status()
+	before := c.Status(ctx)
 	c.Once(ctx)
 
 	if g.notMod.Load() != 1 {
@@ -270,7 +270,7 @@ func TestASecondCheckCostsAConditionalRequest(t *testing.T) {
 	if g.fetched.Load() != 1 {
 		t.Errorf("installer downloads = %d, want 1; it was fetched again", g.fetched.Load())
 	}
-	if after := c.Status(); after.State != before.State {
+	if after := c.Status(ctx); after.State != before.State {
 		t.Errorf("state moved from %q to %q on a 304", before.State, after.State)
 	}
 }
@@ -293,7 +293,7 @@ func TestAutomaticDownloadCanBeTurnedOff(t *testing.T) {
 	if err := c.Download(ctx); err != nil {
 		t.Fatalf("Download: %v", err)
 	}
-	if got := c.Status(); got.State != StateReady {
+	if got := c.Status(ctx); got.State != StateReady {
 		t.Fatalf("state after Download = %q, want %q", got.State, StateReady)
 	}
 }
@@ -313,6 +313,33 @@ func TestCheckingCanBeTurnedOffEntirely(t *testing.T) {
 	}
 	if got.State != StateIdle {
 		t.Errorf("state = %q, want %q", got.State, StateIdle)
+	}
+}
+
+func TestTurningCheckingOffShowsImmediately(t *testing.T) {
+	ctx := context.Background()
+	g := newFakeGitHub(t, "1.1.0")
+	c := newChecker(t, g, "1.0.0")
+	c.Once(ctx)
+
+	if got := c.Status(ctx); !got.Enabled {
+		t.Fatalf("setup: enabled = %v, want true", got.Enabled)
+	}
+
+	// Turned off from the settings page. The next pass is six hours away, and
+	// someone who has just turned it off is looking at the page now — reporting
+	// it as still on until this evening would be a plain lie about what the
+	// service is doing.
+	put(t, c, store.KeyUpdatesEnabled, "0")
+
+	got := c.Status(ctx)
+	if got.Enabled {
+		t.Error("status still reports checking as on after it was turned off")
+	}
+
+	put(t, c, store.KeyUpdatesAutoDownload, "0")
+	if c.Status(ctx).AutoDownload {
+		t.Error("status still reports automatic downloads as on after they were turned off")
 	}
 }
 
@@ -387,10 +414,10 @@ func TestAStagedUpdateSurvivesARestart(t *testing.T) {
 	}
 	restarted.reconcile(ctx)
 
-	if got := restarted.Status(); got.State != StateReady {
+	if got := restarted.Status(ctx); got.State != StateReady {
 		t.Fatalf("state after restart = %q, want %q", got.State, StateReady)
 	}
-	if got := restarted.Status(); got.Latest != "1.1.0" {
+	if got := restarted.Status(ctx); got.Latest != "1.1.0" {
 		t.Errorf("latest after restart = %q, want 1.1.0", got.Latest)
 	}
 }
@@ -411,7 +438,7 @@ func TestATamperedStagedInstallerIsDiscardedOnStartup(t *testing.T) {
 	restarted := &Checker{Store: c.Store, Dirs: c.Dirs, Current: "1.0.0", Log: quiet()}
 	restarted.reconcile(ctx)
 
-	if got := restarted.Status(); got.State == StateReady {
+	if got := restarted.Status(ctx); got.State == StateReady {
 		t.Error("a swapped installer was still reported as ready to run")
 	}
 	if _, err := os.Stat(staged); !os.IsNotExist(err) {
@@ -432,7 +459,7 @@ func TestAnAppliedUpdateTidiesUpAfterItself(t *testing.T) {
 	upgraded := &Checker{Store: c.Store, Dirs: c.Dirs, Current: "1.1.0", Log: quiet()}
 	upgraded.reconcile(ctx)
 
-	if got := upgraded.Status(); got.State != StateIdle {
+	if got := upgraded.Status(ctx); got.State != StateIdle {
 		t.Errorf("state after a successful upgrade = %q, want %q", got.State, StateIdle)
 	}
 	entries, err := os.ReadDir(c.Dirs.UpdateDir())
@@ -467,7 +494,7 @@ func TestAnInstallThatDidNotTakeIsReported(t *testing.T) {
 	same := &Checker{Store: c.Store, Dirs: c.Dirs, Current: "1.0.0", Log: quiet()}
 	same.reconcile(ctx)
 
-	got := same.Status()
+	got := same.Status(ctx)
 	if got.State != StateReady {
 		t.Errorf("state = %q, want the update still offered as %q", got.State, StateReady)
 	}
@@ -514,7 +541,7 @@ func TestInstallRefusesAnInstallerThatChangedUnderIt(t *testing.T) {
 	if _, err := os.Stat(staged); !os.IsNotExist(err) {
 		t.Error("the rejected installer was left on disk")
 	}
-	if got := c.Status(); got.State == StateInstalling {
+	if got := c.Status(ctx); got.State == StateInstalling {
 		t.Error("state moved to installing despite the refusal")
 	}
 }

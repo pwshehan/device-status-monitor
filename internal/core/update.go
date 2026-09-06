@@ -15,11 +15,11 @@ import (
 // making every one of them construct one.
 
 // UpdateStatus is what the last check found and what has been staged.
-func (a *App) UpdateStatus() update.Status {
+func (a *App) UpdateStatus(ctx context.Context) update.Status {
 	if a.Updater == nil {
 		return update.Status{}
 	}
-	return a.Updater.Status()
+	return a.Updater.Status(ctx)
 }
 
 // CheckUpdate asks GitHub now instead of waiting for the next pass.

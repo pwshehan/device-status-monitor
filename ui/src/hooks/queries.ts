@@ -121,18 +121,24 @@ export function useSettings(): UseQueryResult<Settings> {
 }
 
 /**
- * Update state is polled slowly.
+ * Update state is polled slowly, except while something is happening.
  *
- * It changes on the service's own schedule — a check every six hours, or a
- * download that takes a while — so there is nothing to push and nothing to
- * gain from asking often. The exception is a download in progress, where the
- * byte count is the only sign that anything is happening.
+ * It normally changes on the service's own schedule — a check every six hours —
+ * so there is nothing to push and nothing to gain from asking often. Two states
+ * are the exception. While downloading, the byte count is the only sign that
+ * anything is moving. While installing, the service is about to stop and come
+ * back as a new version; a minute of stale "installing…" is the difference
+ * between the page catching up on its own and looking stuck, and it is also how
+ * long an installer that failed to start would go unreported.
  */
 export function useUpdate(): UseQueryResult<UpdateStatus> {
   return useQuery({
     queryKey: keys.update,
     queryFn: api.update,
-    refetchInterval: (query) => (query.state.data?.state === 'downloading' ? 1_000 : 60_000),
+    refetchInterval: (query) => {
+      const state = query.state.data?.state
+      return state === 'downloading' || state === 'installing' ? 1_000 : 60_000
+    },
     // A service that has gone away is the health banner's job to report, not
     // this section's, and retrying would only delay that banner.
     retry: false,

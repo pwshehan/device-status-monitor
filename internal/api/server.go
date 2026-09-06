@@ -57,7 +57,7 @@ type Engine interface {
 	SaveSMTPPassword(ctx context.Context, plaintext string) error
 
 	// UpdateStatus is what the last check found and what has been staged.
-	UpdateStatus() update.Status
+	UpdateStatus(ctx context.Context) update.Status
 
 	// CheckUpdate asks GitHub now instead of waiting for the next pass.
 	CheckUpdate(ctx context.Context) update.Status

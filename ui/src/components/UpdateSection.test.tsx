@@ -95,8 +95,30 @@ describe('UpdateSection', () => {
     withStatus({ enabled: false })
     renderWithProviders(<UpdateSection />)
 
-    expect(await screen.findByText(/Checking for updates is turned off/)).toBeInTheDocument()
+    expect(await screen.findByText(/Checking for new releases is turned off/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Check now' })).toBeDisabled()
+  })
+
+  it('still says what is waiting when checking has been turned off', async () => {
+    withStatus({ enabled: false, state: 'ready', latest: '1.1.0' })
+    renderWithProviders(<UpdateSection />)
+
+    // Turning checking off does not throw away an update already downloaded.
+    // "Checking is off" over a bare Install button says nothing about what the
+    // button would install.
+    expect(await screen.findByText(/Version 1\.1\.0 is downloaded and checked/)).toBeInTheDocument()
+    expect(screen.getByText(/Checking for new releases is turned off/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Install now' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Check now' })).toBeDisabled()
+  })
+
+  it('still reports a failure when checking has been turned off', async () => {
+    withStatus({ enabled: false, state: 'error', error: 'the installer would not start' })
+    renderWithProviders(<UpdateSection />)
+
+    // A failure is the one thing that must not be swallowed by the notice.
+    expect(await screen.findByText(/the installer would not start/)).toBeInTheDocument()
+    expect(screen.getByText(/Nothing has been installed/)).toBeInTheDocument()
   })
 
   it('asks the service to check when told to', async () => {

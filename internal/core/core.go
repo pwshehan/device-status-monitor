@@ -57,6 +57,13 @@ type Options struct {
 	// network before it was anything else.
 	UpdateInterval time.Duration
 
+	// UpdateBaseURL points the update checker at something other than
+	// api.github.com. Injectable for the same reason Prober and Sender are,
+	// and for nothing else: there is no flag and no setting for it, because
+	// "where does this machine take its updates from" is not a question a
+	// monitoring tool should let anyone answer at runtime.
+	UpdateBaseURL string
+
 	// Prober and Sender are injectable for tests.
 	Prober probe.Prober
 	Sender notify.Sender
@@ -184,6 +191,7 @@ func Start(parent context.Context, o Options) (*App, error) {
 			Dirs:     o.Dirs,
 			Current:  o.Version,
 			Interval: o.UpdateInterval,
+			BaseURL:  o.UpdateBaseURL,
 			Log:      o.Log,
 		}
 	}

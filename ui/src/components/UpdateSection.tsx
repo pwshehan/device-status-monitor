@@ -73,15 +73,28 @@ export function UpdateSection() {
 function Body({ status: u }: { status: UpdateStatus }) {
   const muted = 'text-sm text-slate-500 dark:text-slate-400'
 
-  if (!u.enabled) {
-    return (
-      <p className={muted}>
-        Checking for updates is turned off. Turn it back on under Settings, or upgrade by hand from
-        the releases page.
-      </p>
-    )
-  }
+  const off = !u.enabled && (
+    <p className={muted}>
+      Checking for new releases is turned off. Turn it back on under Settings, or upgrade by hand
+      from the releases page.
+    </p>
+  )
+  // The notice sits alongside every other state rather than replacing it.
+  // Turning checking off does not throw away an update already downloaded, and
+  // "checking is off" above a bare Install button tells nobody what the button
+  // would install — or, over a failure, hides the failure. Only "nothing to
+  // report" has nothing worth saying underneath it.
+  if (!u.enabled && u.state === 'idle') return off
 
+  return (
+    <div className="space-y-1">
+      <StateBody status={u} muted={muted} />
+      {off}
+    </div>
+  )
+}
+
+function StateBody({ status: u, muted }: { status: UpdateStatus; muted: string }) {
   switch (u.state) {
     case 'idle':
       return <p className={muted}>Version {u.current} is the latest release.</p>

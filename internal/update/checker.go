@@ -159,11 +159,20 @@ func (c *Checker) startupDelay() time.Duration {
 }
 
 // Status reports the current state.
-func (c *Checker) Status() Status {
+//
+// The two settings are read from the store on every call rather than served
+// from whatever the last pass saw. A pass happens every six hours, and someone
+// who has just turned checking off is looking at the page now — being told for
+// the rest of the afternoon that it is still on would be a plain lie about
+// what the service is doing.
+func (c *Checker) Status(ctx context.Context) Status {
 	c.mu.RLock()
 	s := c.status
 	c.mu.RUnlock()
 
+	if policy, err := c.Store.UpdatePolicy(ctx); err == nil {
+		s.Enabled, s.AutoDownload = policy.Enabled, policy.AutoDownload
+	}
 	s.Supported = c.supported()
 	s.Current = c.Current
 	if s.State == StateDownloading {
@@ -299,13 +308,13 @@ func (c *Checker) Once(ctx context.Context) Status {
 		s.AutoDownload = policy.AutoDownload
 	})
 	if !policy.Enabled || !c.canCheck() {
-		return c.Status()
+		return c.Status(ctx)
 	}
 
 	all, err := c.Store.AllSettings(ctx)
 	if err != nil {
 		log.Warn("read update state", "err", err)
-		return c.Status()
+		return c.Status(ctx)
 	}
 
 	rel, etag, err := c.client().latest(ctx, all[store.KeyUpdatesETag])
@@ -319,7 +328,7 @@ func (c *Checker) Once(ctx context.Context) Status {
 			store.KeyUpdatesETag:        etag,
 		})
 		c.setStatus(func(s *Status) { s.LastCheckedAt = now; s.Err = "" })
-		return c.Status()
+		return c.Status(ctx)
 
 	case err != nil:
 		// A machine with no route to the internet is a supported way to run
@@ -333,7 +342,7 @@ func (c *Checker) Once(ctx context.Context) Status {
 			store.KeyUpdatesError:       err.Error(),
 		})
 		c.setStatus(func(s *Status) { s.LastCheckedAt = now; s.Err = err.Error() })
-		return c.Status()
+		return c.Status(ctx)
 	}
 
 	latest := rel.Version()
@@ -364,11 +373,11 @@ func (c *Checker) Once(ctx context.Context) Status {
 			c.discardStaged(ctx)
 		}
 		c.setStatus(func(s *Status) { s.State = StateIdle })
-		return c.Status()
+		return c.Status(ctx)
 	}
 
-	if all[store.KeyUpdatesReadyVer] == latest && c.Status().State == StateReady {
-		return c.Status()
+	if all[store.KeyUpdatesReadyVer] == latest && c.Status(ctx).State == StateReady {
+		return c.Status(ctx)
 	}
 
 	log.Info("a newer release is available", "current", c.Current, "latest", latest)
@@ -379,7 +388,7 @@ func (c *Checker) Once(ctx context.Context) Status {
 			log.Warn("stage update", "version", latest, "err", err)
 		}
 	}
-	return c.Status()
+	return c.Status(ctx)
 }
 
 // Download stages the installer for the newest known release.

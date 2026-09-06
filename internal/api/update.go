@@ -57,7 +57,7 @@ func newUpdateDTO(s update.Status) updateResponse {
 }
 
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, newUpdateDTO(s.eng.UpdateStatus()))
+	writeJSON(w, http.StatusOK, newUpdateDTO(s.eng.UpdateStatus(r.Context())))
 }
 
 // handleUpdateCheck asks GitHub now rather than waiting for the next pass.
@@ -75,10 +75,10 @@ func (s *Server) handleUpdateDownload(w http.ResponseWriter, r *http.Request) {
 		// A download failure is not a server fault and not a bad request: the
 		// release, the network or the checksum did not cooperate. The state
 		// carries the detail, so the body is the status either way.
-		writeJSON(w, http.StatusConflict, newUpdateDTO(s.eng.UpdateStatus()))
+		writeJSON(w, http.StatusConflict, newUpdateDTO(s.eng.UpdateStatus(r.Context())))
 		return
 	}
-	writeJSON(w, http.StatusOK, newUpdateDTO(s.eng.UpdateStatus()))
+	writeJSON(w, http.StatusOK, newUpdateDTO(s.eng.UpdateStatus(r.Context())))
 }
 
 // handleUpdateInstall runs the staged installer.
@@ -99,5 +99,5 @@ func (s *Server) handleUpdateInstall(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "install_failed", err.Error(), "")
 		return
 	}
-	writeJSON(w, http.StatusAccepted, newUpdateDTO(s.eng.UpdateStatus()))
+	writeJSON(w, http.StatusAccepted, newUpdateDTO(s.eng.UpdateStatus(r.Context())))
 }
