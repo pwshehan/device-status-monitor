@@ -18,7 +18,26 @@ import (
 
 // DefaultAddr is the loopback address the service listens on. Never 0.0.0.0:
 // this API is a local control channel, not a network service.
-const DefaultAddr = "127.0.0.1:49215"
+//
+// The port is below 49152 on purpose, and raising it above that would bring
+// back a bug that is very hard to recognise from its symptom. 49152 and up is
+// the Windows ephemeral range, and anything using WinNAT — Hyper-V, WSL2,
+// Docker Desktop, Windows Sandbox — reserves blocks of it at boot, in
+// different places after each reboot. A service whose port lands inside a
+// reserved block cannot bind at all, and what Windows says about it is
+//
+//	bind: An attempt was made to access a socket in a way forbidden by its
+//	access permissions
+//
+// which reads like a permissions problem rather than a port problem. Since the
+// bind here doubles as the single-instance guard, that failure takes the whole
+// service down rather than just the API: an installed copy would run for months
+// and then refuse to start after an unrelated reboot.
+//
+// The current reservations are listed by:
+//
+//	netsh interface ipv4 show excludedportrange protocol=tcp
+const DefaultAddr = "127.0.0.1:39215"
 
 // Engine is what the handlers need from the running monitor.
 //

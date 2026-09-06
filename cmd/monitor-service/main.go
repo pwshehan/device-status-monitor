@@ -36,7 +36,7 @@ Flags:
   -dev            run in the foreground against ./.dev-data
   -seed           create example groups and devices if the database is empty
   -log-level      debug | info | warn | error (default info)
-  -api-addr       loopback address for the local API (default 127.0.0.1:49215)
+  -api-addr       loopback address for the local API (default 127.0.0.1:39215)
 `
 
 func main() {

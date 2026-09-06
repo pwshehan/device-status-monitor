@@ -53,7 +53,7 @@ sc.exe qfailure LocalMonitorSvc
 ## 3. It is actually monitoring
 
 ```
-curl http://127.0.0.1:49215/api/health
+curl http://127.0.0.1:39215/api/health
 ```
 
 - [ ] Answers without a token, `"ok": true`, `"db_ok": true`

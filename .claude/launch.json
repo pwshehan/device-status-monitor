@@ -11,7 +11,7 @@
       "cwd": "ui",
       "port": 5173,
       "env": {
-        "MONITOR_API": "http://127.0.0.1:49216"
+        "MONITOR_API": "http://127.0.0.1:39216"
       }
     }
   ]

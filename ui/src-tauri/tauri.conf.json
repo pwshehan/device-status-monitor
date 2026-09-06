@@ -12,7 +12,7 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": "default-src 'self'; connect-src http://127.0.0.1:49215 http://localhost:49215; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
+      "csp": "default-src 'self'; connect-src http://127.0.0.1:39215 http://localhost:39215; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
       "capabilities": [
         "default"
       ]

@@ -250,7 +250,7 @@ with the counter reset daily.
 
 ## The local API
 
-The service listens on `127.0.0.1:49215`. Loopback is not the security model —
+The service listens on `127.0.0.1:39215`. Loopback is not the security model —
 every local process can reach a loopback port — so there are three layers: a
 bearer token, `Host`/`Origin` pinning, and a loopback check on `RemoteAddr`.
 
@@ -262,27 +262,27 @@ service.
 ```bash
 TOKEN=$(cat "C:/ProgramData/LocalMonitor/api.token")
 
-curl -s localhost:49215/api/health | jq                       # no token needed
-curl -s -H "Authorization: Bearer $TOKEN" localhost:49215/api/summary | jq
+curl -s localhost:39215/api/health | jq                       # no token needed
+curl -s -H "Authorization: Bearer $TOKEN" localhost:39215/api/summary | jq
 
 # What this machine knows about the newest release. Behind the token: which
 # machines are behind on patches is not something to hand out unauthenticated.
-curl -s -H "Authorization: Bearer $TOKEN" localhost:49215/api/update | jq
-curl -s -X POST -H "Authorization: Bearer $TOKEN" localhost:49215/api/update/check | jq
+curl -s -H "Authorization: Bearer $TOKEN" localhost:39215/api/update | jq
+curl -s -X POST -H "Authorization: Bearer $TOKEN" localhost:39215/api/update/check | jq
 
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' localhost:49215/api/devices \
+  -H 'Content-Type: application/json' localhost:39215/api/devices \
   -d '{"name":"Core switch","ip_address":"10.0.0.1","port":22,"group_id":1}' | jq
 
 # Move devices between groups in one transaction and one scheduler reload
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' localhost:49215/api/devices/bulk \
+  -H 'Content-Type: application/json' localhost:39215/api/devices/bulk \
   -d '{"ids":[1,2,3],"op":"move","group_id":2}' | jq
 
 # Live transitions. curl, not EventSource: the stream needs the auth header,
 # which the browser EventSource API cannot set — the UI uses fetch().
 curl -N -H "Authorization: Bearer $TOKEN" \
-  'localhost:49215/api/events?types=device_status,incident'
+  'localhost:39215/api/events?types=device_status,incident'
 ```
 
 A nullable probe setting is `null` when the row inherits, and every response

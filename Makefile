@@ -52,7 +52,7 @@ tidy: ## Tidy go.mod
 ui-install: ## Install the UI's dependencies
 	cd ui && npm ci
 
-ui-dev: ## Run the UI dev server against the running service on :49215
+ui-dev: ## Run the UI dev server against the running service on :39215
 	cd ui && npm run dev
 
 ui-build: ## Type-check and build the UI into ui/dist

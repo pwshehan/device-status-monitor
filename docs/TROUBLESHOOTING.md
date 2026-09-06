@@ -10,12 +10,12 @@ possibility at once.
 |---|---|
 | `C:\ProgramData\LocalMonitor\logs\monitor.log` | everything the service did, rotating at 10 MB |
 | Event Viewer → Windows Logs → Application, source `LocalMonitorSvc` | failures to *start*, and warnings and errors only |
-| `http://127.0.0.1:49215/api/health` | the service's own view of itself; needs no token |
+| `http://127.0.0.1:39215/api/health` | the service's own view of itself; needs no token |
 
 Health is the fastest first check:
 
 ```
-curl http://127.0.0.1:49215/api/health
+curl http://127.0.0.1:39215/api/health
 ```
 
 ---
@@ -35,7 +35,7 @@ start*, below.
 listening:
 
 ```
-netstat -ano | findstr 49215
+netstat -ano | findstr 39215
 ```
 
 If something *else* holds the port, the service would not have started at all
@@ -64,7 +64,7 @@ old token until it restarts. That is why the command tells you to restart.
 Look in **Event Viewer** first: a start failure is reported there because at
 that point the log file may not exist yet.
 
-**"start api on 127.0.0.1:49215: bind: Only one usage of each socket
+**"start api on 127.0.0.1:39215: bind: Only one usage of each socket
 address..."** — something already holds the API port, and the engine refuses to
 start rather than run beside it. That is deliberate: the port doubles as the
 single-instance guard, and two copies probing the same devices would double
@@ -78,7 +78,23 @@ the same port even though its database is elsewhere:
 tasklist | findstr monitor-service
 ```
 
-Stop it, or give it a different port with `-api-addr 127.0.0.1:49216`.
+Stop it, or give it a different port with `-api-addr 127.0.0.1:39216`.
+
+**"bind: An attempt was made to access a socket in a way forbidden by its
+access permissions"** — this reads like a permissions problem and is not one.
+Windows has reserved the port. Anything using WinNAT — Hyper-V, WSL2, Docker
+Desktop, Windows Sandbox — reserves blocks of the ephemeral range (49152 and
+up) at boot, and the blocks move between reboots, so a service that has worked
+for months can fail to start after an unrelated restart.
+
+The default port is 39215 precisely to stay out of that range, so you should
+only see this if you have moved it with `-api-addr`. Check what is reserved:
+
+```
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+Then pick a port below 49152 that is not listed.
 
 **"open database: ... locked" or "unable to open database file"** — the data
 directory is not writable, or the file is held by something else. Usually an

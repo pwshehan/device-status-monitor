@@ -71,7 +71,7 @@ already exists.
 
 ### Interfaces
 
-- A loopback HTTP API on `127.0.0.1:49215` with a bearer token, `Host`/`Origin`
+- A loopback HTTP API on `127.0.0.1:39215` with a bearer token, `Host`/`Origin`
   pinning and a loopback check — because binding to loopback is not a security
   model on its own.
 - Server-sent events for live status, so badges move in milliseconds without

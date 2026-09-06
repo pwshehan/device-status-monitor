@@ -236,7 +236,7 @@ func (e *env) mustCall(method, path string, body, out any, want int) {
 func localRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
 	req.RemoteAddr = "127.0.0.1:54321"
-	req.Host = "127.0.0.1:49215"
+	req.Host = "127.0.0.1:39215"
 	return req
 }
 
@@ -344,11 +344,11 @@ func TestRebindingHostAndOriginAreRejected(t *testing.T) {
 		want   int
 	}{
 		{"attacker host", "monitor.attacker.example", "", http.StatusForbidden},
-		{"attacker origin", "127.0.0.1:49215", "https://attacker.example", http.StatusForbidden},
-		{"loopback host", "127.0.0.1:49215", "", http.StatusOK},
-		{"localhost host", "localhost:49215", "", http.StatusOK},
-		{"dev server origin", "127.0.0.1:49215", "http://localhost:5173", http.StatusOK},
-		{"tauri origin", "127.0.0.1:49215", "tauri://localhost", http.StatusOK},
+		{"attacker origin", "127.0.0.1:39215", "https://attacker.example", http.StatusForbidden},
+		{"loopback host", "127.0.0.1:39215", "", http.StatusOK},
+		{"localhost host", "localhost:39215", "", http.StatusOK},
+		{"dev server origin", "127.0.0.1:39215", "http://localhost:5173", http.StatusOK},
+		{"tauri origin", "127.0.0.1:39215", "tauri://localhost", http.StatusOK},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
