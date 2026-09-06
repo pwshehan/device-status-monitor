@@ -1,16 +1,22 @@
 # Changelog
 
-## 1.0.0
+## Unreleased — 1.0.0 candidate
+
+Nothing has been released yet: there is no tag and no published build. The root
+[VERSION](VERSION) file holds the version being prepared, not one that has
+shipped.
 
 Everything below is built and tested. **One thing stands between this and the
 tag**: the install-and-reboot acceptance run in
 [installer/ACCEPTANCE.md](installer/ACCEPTANCE.md), which needs a Windows
 machine to install on and cannot be claimed without doing it.
 
-The version in the root [VERSION](VERSION) file is what this release is. The
-release workflow refuses to build a tag that disagrees with it, refuses a
-version with no section in this file, and refuses to publish over a tag that
-already exists.
+Retitling this heading to `## 1.0.0` is a deliberate step taken at release
+time, and the release will not build until it is: the workflow refuses a tag
+that disagrees with `VERSION`, refuses a version with no section of its own
+here, and refuses to publish over a tag that already exists. Leaving the
+heading as it stands is what keeps an accidental `git push --tags` from
+producing a release.
 
 ### Monitoring
 
