@@ -81,6 +81,12 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: { '/api': apiProxy },
+    // Nothing under src-tauri is frontend source, and target/ is where cargo
+    // rewrites a multi-megabyte DLL every time the shell rebuilds. Watching it
+    // does not just waste effort: `tauri dev` rebuilds while the dev server is
+    // running, and the watcher dies with EBUSY on the half-written file, taking
+    // the dev server down with it.
+    watch: { ignored: ['**/src-tauri/**'] },
   },
   build: {
     outDir: 'dist',
