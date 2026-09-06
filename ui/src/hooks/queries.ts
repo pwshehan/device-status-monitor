@@ -21,6 +21,7 @@ import type {
   Sample,
   Settings,
   Summary,
+  UpdateStatus,
 } from '../api/types'
 
 /** Query keys, in one place so the event stream can invalidate by prefix. */
@@ -37,6 +38,7 @@ export const keys = {
   group: (id: number) => ['groups', id] as const,
   groupUptime: (id: number, days: number) => ['groups', id, 'uptime', days] as const,
   settings: ['settings'] as const,
+  update: ['update'] as const,
 }
 
 /**
@@ -116,6 +118,25 @@ export function useGroupUptime(id: number, days = 90): UseQueryResult<GroupDayUp
 
 export function useSettings(): UseQueryResult<Settings> {
   return useQuery({ queryKey: keys.settings, queryFn: api.settings })
+}
+
+/**
+ * Update state is polled slowly.
+ *
+ * It changes on the service's own schedule — a check every six hours, or a
+ * download that takes a while — so there is nothing to push and nothing to
+ * gain from asking often. The exception is a download in progress, where the
+ * byte count is the only sign that anything is happening.
+ */
+export function useUpdate(): UseQueryResult<UpdateStatus> {
+  return useQuery({
+    queryKey: keys.update,
+    queryFn: api.update,
+    refetchInterval: (query) => (query.state.data?.state === 'downloading' ? 1_000 : 60_000),
+    // A service that has gone away is the health banner's job to report, not
+    // this section's, and retrying would only delay that banner.
+    retry: false,
+  })
 }
 
 // --- mutations ---------------------------------------------------------------
@@ -238,6 +259,37 @@ export function useSaveSettings(): UseMutationResult<Settings, Error, unknown> {
       void queryClient.invalidateQueries({ queryKey: keys.devices })
     },
   })
+}
+
+/**
+ * The three update actions. Each answers with the new state, which is written
+ * straight into the cache: the service is the authority on what it has staged,
+ * and guessing locally is how a button ends up disagreeing with the text above
+ * it.
+ */
+function useUpdateAction(
+  fn: () => Promise<UpdateStatus>,
+): UseMutationResult<UpdateStatus, Error, void> {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (status) => queryClient.setQueryData(keys.update, status),
+    // A failure leaves the cache alone and surfaces through the mutation's own
+    // error, so the section can say what went wrong without losing what it
+    // already knew.
+  })
+}
+
+export function useCheckUpdate(): UseMutationResult<UpdateStatus, Error, void> {
+  return useUpdateAction(api.checkUpdate)
+}
+
+export function useDownloadUpdate(): UseMutationResult<UpdateStatus, Error, void> {
+  return useUpdateAction(api.downloadUpdate)
+}
+
+export function useInstallUpdate(): UseMutationResult<UpdateStatus, Error, void> {
+  return useUpdateAction(api.installUpdate)
 }
 
 export function useTestEmail(): UseMutationResult<

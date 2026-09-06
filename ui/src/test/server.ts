@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 
-import type { Device, Group, Health, Settings, Summary } from '../api/types'
+import type { Device, Group, Health, Settings, Summary, UpdateStatus } from '../api/types'
 
 /** A device with the fields a test does not care about filled in. */
 export function makeDevice(overrides: Partial<Device> = {}): Device {
@@ -144,6 +144,23 @@ export const defaultSettings: Settings = {
     recovery_threshold: 1,
   },
   retention: { raw_days: 14, rollup_days: 400 },
+  updates: { enabled: true, auto_download: true },
+}
+
+/**
+ * Nothing to update: what a healthy, current machine reports. Tests that care
+ * about the update section override it with server.use(...).
+ */
+export const defaultUpdate: UpdateStatus = {
+  supported: true,
+  enabled: true,
+  auto_download: true,
+  current: '1.0.0',
+  state: 'idle',
+  published_at: null,
+  size_bytes: 0,
+  downloaded_bytes: 0,
+  last_checked_at: '2026-03-01T12:00:00Z',
 }
 
 /**
@@ -157,6 +174,7 @@ export const handlers = [
   http.get('/api/devices', () => HttpResponse.json({ devices: [makeDevice()] })),
   http.get('/api/groups', () => HttpResponse.json({ groups: [makeGroup()] })),
   http.get('/api/settings', () => HttpResponse.json(defaultSettings)),
+  http.get('/api/update', () => HttpResponse.json(defaultUpdate)),
   http.get('/api/groups/:id/uptime', () => HttpResponse.json({ uptime: [] })),
   http.get('/api/devices/:id/incidents', () => HttpResponse.json({ incidents: [] })),
   // The stream: an empty body, so the app's reader completes rather than

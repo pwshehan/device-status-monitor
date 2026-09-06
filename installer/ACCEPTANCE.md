@@ -99,6 +99,36 @@ Build a second installer with a higher version and run it over the top.
 - [ ] **The database survived**: the device list and history are unchanged
 - [ ] `monitor-service.exe version` reports the new version
 
+## 6a. Upgrade from inside the dashboard
+
+The other half of §6, and the one nothing in CI can reach: the service
+downloading a release, checking it, and running the installer as `LocalSystem`
+with nobody watching.
+
+Needs a real published release newer than the installed version.
+
+- [ ] With the older version installed, the **Service** page shows the newer one
+      as available, then as downloaded and checked
+- [ ] `C:\ProgramData\LocalMonitor\updates\` holds one
+      `LocalMonitor-Setup-<version>.exe` and nothing else
+- [ ] Its ACL lists **only** SYSTEM and Administrators — check with
+      `icacls C:\ProgramData\LocalMonitor\updates`. A standard user able to write
+      there could hand themselves a SYSTEM shell
+- [ ] Pressing **Install now** returns immediately and the page says it is
+      installing
+- [ ] The dashboard loses the service for a few seconds, then reconnects on its
+      own — no restart of the window, no reboot
+- [ ] `sc.exe query LocalMonitorSvc` reports RUNNING again
+- [ ] `monitor-service.exe version` reports the new version
+- [ ] The Service page shows the new version with no update pending
+- [ ] The staged installer is **gone** from `updates\` — the new service tidies
+      up after the old one's work
+- [ ] **The database survived**: the device list and history are unchanged
+- [ ] `C:\ProgramData\LocalMonitor\logs\update-install.log` records a clean
+      silent install
+- [ ] Turning both settings off under **Settings → Updates** stops the checking:
+      nothing new appears on the Service page and nothing lands in `updates\`
+
 ## 7. Uninstall
 
 Uninstall from Settings → Apps.
@@ -119,3 +149,5 @@ The service has no console, so start with:
   where a failure to start is reported
 - `C:\ProgramData\LocalMonitor\logs\monitor.log` — everything else
 - `%TEMP%\Setup Log*.txt` — Inno Setup's own log, if the installer failed
+- `C:\ProgramData\LocalMonitor\logs\update-install.log` — the installer the
+  service launched on its own, for §6a

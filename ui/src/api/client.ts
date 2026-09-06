@@ -15,6 +15,7 @@ import type {
   Settings,
   Status,
   Summary,
+  UpdateStatus,
 } from './types'
 
 /**
@@ -251,6 +252,16 @@ export const api = {
     request<{ uptime: GroupDayUptime[] }>(`/groups/${id}/uptime?days=${days}`).then(
       (r) => r.uptime,
     ),
+
+  update: () => request<UpdateStatus>('/update'),
+
+  checkUpdate: () => request<UpdateStatus>('/update/check', { method: 'POST' }),
+
+  downloadUpdate: () => request<UpdateStatus>('/update/download', { method: 'POST' }),
+
+  // Answers 202 and returns before the installer starts, because the installer
+  // stops the service this request is talking to.
+  installUpdate: () => request<UpdateStatus>('/update/install', { method: 'POST' }),
 
   settings: () => request<Settings>('/settings'),
 

@@ -243,6 +243,36 @@ export interface Settings {
     raw_days: number
     rollup_days: number
   }
+  updates: {
+    /** Whether the service contacts GitHub at all. */
+    enabled: boolean
+    /** Stage a new installer automatically. It is never run without a click. */
+    auto_download: boolean
+  }
+}
+
+/** Where this machine has got to with the newest release. */
+export type UpdateState = 'idle' | 'available' | 'downloading' | 'ready' | 'installing' | 'error'
+
+export interface UpdateStatus {
+  /**
+   * False where an update could not be applied even if one existed: a
+   * non-Windows build, a dev run, or a binary with no version stamped in. The
+   * page hides the whole section rather than offering a button that would fail.
+   */
+  supported: boolean
+  enabled: boolean
+  auto_download: boolean
+  current: string
+  state: UpdateState
+  latest?: string
+  notes_url?: string
+  published_at: string | null
+  /** Only meaningful while downloading. */
+  size_bytes: number
+  downloaded_bytes: number
+  last_checked_at: string | null
+  error?: string
 }
 
 /** The error envelope every endpoint uses on failure. */

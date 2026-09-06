@@ -22,6 +22,8 @@ interface Form {
   recovery: string
   rawDays: string
   rollupDays: string
+  updatesEnabled: boolean
+  autoDownload: boolean
 }
 
 /** Seeds the editable form from what the service currently holds. */
@@ -45,6 +47,10 @@ function formOf(s: ApiSettings): Form {
     recovery: String(s.defaults.recovery_threshold),
     rawDays: String(s.retention.raw_days),
     rollupDays: String(s.retention.rollup_days),
+    // The only two booleans on this form; everything else is a number the
+    // service validates, so they stay as typed strings until submit.
+    updatesEnabled: s.updates.enabled,
+    autoDownload: s.updates.auto_download,
   }
 }
 
@@ -117,6 +123,7 @@ function SettingsForm({ settings: stored, onDiscard }: FormProps) {
           recovery_threshold: Number(form.recovery),
         },
         retention: { raw_days: Number(form.rawDays), rollup_days: Number(form.rollupDays) },
+        updates: { enabled: form.updatesEnabled, auto_download: form.autoDownload },
       },
       {
         onSuccess: () => {
@@ -423,6 +430,47 @@ function SettingsForm({ settings: stored, onDiscard }: FormProps) {
             )}
           </Field>
         </div>
+      </section>
+
+      <section className="space-y-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+        <h2 className="text-sm font-semibold">Updates</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          The service asks the releases page for a newer version every few hours. It never installs
+          anything on its own — applying an update is a button on the Service page.
+        </p>
+
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 rounded border-slate-300 accent-accent-600"
+            checked={form.updatesEnabled}
+            onChange={(e) => set('updatesEnabled', e.target.checked)}
+          />
+          <span>
+            Check for new releases
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              The only outbound request this service makes. Turn it off and it talks to nothing but
+              the devices it monitors and your mail server.
+            </span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 rounded border-slate-300 accent-accent-600"
+            checked={form.autoDownload}
+            disabled={!form.updatesEnabled}
+            onChange={(e) => set('autoDownload', e.target.checked)}
+          />
+          <span>
+            Download the installer as soon as one is available
+            <span className="block text-xs text-slate-500 dark:text-slate-400">
+              Downloaded, checked against the published checksums, and left alone until someone
+              installs it. Off means the download waits for a button too.
+            </span>
+          </span>
+        </label>
       </section>
 
       <div className="flex items-center gap-3">
