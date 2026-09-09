@@ -2,10 +2,17 @@
 
 ## Unreleased
 
-Leaving this heading as `Unreleased` is what keeps an accidental
+Nothing yet. Leaving this heading as `Unreleased` is what keeps an accidental
 `git push --tags` from producing a release: the workflow refuses a tag with no
 section of its own here. Retitling it to the version being shipped is a
 deliberate step taken at release time.
+
+## 1.0.1
+
+A naming release. Nothing about what is monitored, alerted on or recorded has
+changed; the reason to take it is that the software now calls itself the same
+thing everywhere, and the reason it exists at all is that the update path
+wanted proving against a real second release.
 
 ### Naming
 

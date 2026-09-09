@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# Pushing three times to a branch should not leave three full builds racing:
+# only the newest commit's result is of any interest, and the shell job takes
+# four minutes on a Windows runner. Deliberately not applied to release.yml —
+# cancelling a release halfway through publishing would leave a tag with some
+# of its assets.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   go:
     runs-on: ubuntu-latest
