@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest something the monitor should do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two limits are deliberate, and proposals that cross them need to argue
+        the case rather than assume it:
+
+        - **TCP only.** A new prober (ICMP, HTTP, SNMP) is welcome —
+          `internal/probe` is an interface so they can be added without
+          touching the state machine.
+        - **One machine.** Watching several sites means an agent plus a central
+          server, which changes the API's trust model. See PLAN.md §16.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The situation you are actually in, not the feature you have in mind for it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried instead?
+      description: Including whether an existing feature nearly does it.

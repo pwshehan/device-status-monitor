@@ -1,0 +1,36 @@
+# Keeps the four toolchains this project spans from drifting. Grouped and
+# monthly rather than per-dependency and weekly: a Windows service with a
+# manual acceptance run cannot absorb a stream of individual bumps.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: monthly
+    groups:
+      ui-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /ui/src-tauri
+    schedule:
+      interval: monthly
+    groups:
+      shell-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

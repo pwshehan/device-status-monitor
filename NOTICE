@@ -1,0 +1,28 @@
+Local Device Monitor
+Copyright 2026 Shehan Wijethunga
+
+This product includes software developed as part of the Local Device Monitor
+project (https://github.com/pwshehan/device-status-monitor).
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file for the
+full terms.
+
+---
+
+This software depends on third-party components distributed under their own
+permissive licences, retained in their respective module directories rather
+than reproduced here:
+
+  golang.org/x/sys                     BSD-3-Clause
+  gopkg.in/natefinch/lumberjack.v2     MIT
+  modernc.org/sqlite (and modernc.org  BSD-3-Clause
+    libc, mathutil, memory)
+  Tauri (@tauri-apps/*, tauri crates)  Apache-2.0 OR MIT
+  React, React DOM, React Router       MIT
+  TanStack Query                       MIT
+  uPlot                                MIT
+
+Run `go mod download` and `npm ci` to obtain each dependency together with its
+own licence text. The Microsoft Edge WebView2 runtime bootstrapper bundled by
+the installer is redistributed under the terms Microsoft grants for it and is
+not covered by this project's licence.
