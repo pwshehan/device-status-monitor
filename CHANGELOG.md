@@ -1,22 +1,9 @@
 # Changelog
 
-## Unreleased — 1.0.0 candidate
+## 1.0.0
 
-Nothing has been released yet: there is no tag and no published build. The root
-[VERSION](VERSION) file holds the version being prepared, not one that has
-shipped.
-
-Everything below is built and tested. **One thing stands between this and the
-tag**: the install-and-reboot acceptance run in
-[installer/ACCEPTANCE.md](installer/ACCEPTANCE.md), which needs a Windows
-machine to install on and cannot be claimed without doing it.
-
-Retitling this heading to `## 1.0.0` is a deliberate step taken at release
-time, and the release will not build until it is: the workflow refuses a tag
-that disagrees with `VERSION`, refuses a version with no section of its own
-here, and refuses to publish over a tag that already exists. Leaving the
-heading as it stands is what keeps an accidental `git push --tags` from
-producing a release.
+First release. A Windows service that watches devices over TCP, records the
+history, and emails when something goes down.
 
 ### Monitoring
 
