@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Local Monitor",
+  "productName": "Local Device Monitor",
   "version": "0.1.0",
   "identifier": "engineer.shein.localmonitor",
   "build": {
@@ -23,8 +23,8 @@
     "targets": [
       "nsis"
     ],
-    "publisher": "Shein.Engineer",
-    "copyright": "Shein.Engineer",
+    "publisher": "Shehan Wijethunga",
+    "copyright": "Copyright 2026 Shehan Wijethunga",
     "category": "Utility",
     "shortDescription": "Local device monitoring",
     "longDescription": "Watches TCP endpoints on the local network and emails when one stops answering. The monitoring service runs independently of this window.",

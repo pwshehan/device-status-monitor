@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/pwshehan/device-status-monitor/internal/update"
+	"github.com/pwshehan/local-device-monitor/internal/update"
 )
 
 // The engine's half of the update surface. Thin delegations to the checker,

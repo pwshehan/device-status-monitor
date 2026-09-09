@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/appdir"
-	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/appdir"
+	"github.com/pwshehan/local-device-monitor/internal/store"
 )
 
 // State is where one installed copy has got to with the newest release.

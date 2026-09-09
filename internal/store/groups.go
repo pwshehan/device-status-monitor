@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/model"
 )
 
 const groupCols = `id, name, description, color, sort_order,

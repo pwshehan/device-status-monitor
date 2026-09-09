@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/pwshehan/device-status-monitor/internal/update"
+	"github.com/pwshehan/local-device-monitor/internal/update"
 )
 
 // updateResponse is what the Service page renders.

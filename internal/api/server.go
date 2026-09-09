@@ -11,9 +11,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/probe"
-	"github.com/pwshehan/device-status-monitor/internal/store"
-	"github.com/pwshehan/device-status-monitor/internal/update"
+	"github.com/pwshehan/local-device-monitor/internal/probe"
+	"github.com/pwshehan/local-device-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/update"
 )
 
 // DefaultAddr is the loopback address the service listens on. Never 0.0.0.0:

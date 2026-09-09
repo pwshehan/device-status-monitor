@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/model"
 )
 
 // Counts is the dashboard's top row.

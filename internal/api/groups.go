@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
-	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/store"
 )
 
 // groupBody is the create/update body. As with devices, every field is an Opt

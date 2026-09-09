@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/core"
+	"github.com/pwshehan/local-device-monitor/internal/core"
 )
 
 // ServiceName matches the Windows build so callers can name the service — for

@@ -3,7 +3,7 @@
 # The Go engine cross-compiles to Windows from any host. The Tauri GUI and the
 # Inno Setup installer do not: those are built on a windows-latest CI runner.
 
-MODULE  := github.com/pwshehan/device-status-monitor
+MODULE  := github.com/pwshehan/local-device-monitor
 # The single source of truth for the release version. The release workflow
 # refuses to build unless the tag agrees with this file.
 VERSION ?= $(shell tr -d '[:space:]' < VERSION)
@@ -77,7 +77,7 @@ installer: ## Build the Windows installer from whatever is already in dist/
 	iscc /DAppVersion=$(VERSION) installer/setup.iss
 
 release-local: build-windows app-build ## Build both exes and the installer (Windows)
-	cp ui/src-tauri/target/release/local-monitor-gui.exe $(DIST)/monitor-gui.exe
+	cp ui/src-tauri/target/release/local-device-monitor-gui.exe $(DIST)/monitor-gui.exe
 	iscc /DAppVersion=$(VERSION) installer/setup.iss
 
 check: lint test ui-lint ui-test ## Everything CI runs, minus the cross-builds

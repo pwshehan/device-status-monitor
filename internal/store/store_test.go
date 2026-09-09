@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
-	"github.com/pwshehan/device-status-monitor/internal/state"
+	"github.com/pwshehan/local-device-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/state"
 )
 
 func ptr[T any](v T) *T { return &v }

@@ -50,7 +50,7 @@ function Shell() {
 
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-2">
-          <span className="font-semibold">Local Monitor</span>
+          <span className="font-semibold">Local Device Monitor</span>
 
           <nav className="flex gap-1">
             {tabs.map((tab) => (

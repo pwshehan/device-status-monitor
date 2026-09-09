@@ -16,7 +16,13 @@ import (
 
 // Repo is where releases are published. It matches the module path by
 // construction; spelled out here so the URL is greppable.
-const Repo = "pwshehan/device-status-monitor"
+//
+// The repository was renamed from device-status-monitor after 1.0.0, which
+// baked the old path into every copy already installed. Those keep working
+// because GitHub redirects the API for a renamed repository and the client
+// follows redirects — but only for as long as nothing else claims the old
+// name, so the old name must never be reused.
+const Repo = "pwshehan/local-device-monitor"
 
 // defaultBaseURL is the GitHub API root. The tests point a Checker at an
 // httptest server instead, which is the only reason this is a field on the

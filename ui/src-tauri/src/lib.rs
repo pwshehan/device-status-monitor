@@ -109,9 +109,9 @@ fn set_tray_status(app: tauri::AppHandle, up: u32, down: u32, paused: u32) -> Re
 /// The tray tooltip: what is wrong first, since that is why anyone hovers.
 fn tooltip_text(up: u32, down: u32, paused: u32) -> String {
     let summary = if down > 0 {
-        format!("Local Monitor — {down} down, {up} up")
+        format!("Local Device Monitor — {down} down, {up} up")
     } else {
-        format!("Local Monitor — all {up} up")
+        format!("Local Device Monitor — all {up} up")
     };
     if paused > 0 {
         format!("{summary} ({paused} paused)")
@@ -152,7 +152,7 @@ pub fn run() {
             // window cannot carry an initialization script, and the token has
             // to be in place before the bundle evaluates.
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
-                .title("Local Monitor")
+                .title("Local Device Monitor")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(900.0, 600.0)
                 .center()
@@ -172,7 +172,7 @@ pub fn run() {
 
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().cloned().ok_or("no window icon")?)
-                .tooltip("Local Monitor")
+                .tooltip("Local Device Monitor")
                 .menu(&menu)
                 // The menu is for the right button; a left click is the
                 // shortcut people actually use.
@@ -218,7 +218,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running the Local Monitor shell");
+        .expect("error while running the Local Device Monitor shell");
 }
 
 #[cfg(test)]
@@ -227,15 +227,18 @@ mod tests {
 
     #[test]
     fn tooltip_leads_with_what_is_wrong() {
-        assert_eq!(tooltip_text(8, 0, 0), "Local Monitor — all 8 up");
-        assert_eq!(tooltip_text(6, 2, 0), "Local Monitor — 2 down, 6 up");
+        assert_eq!(tooltip_text(8, 0, 0), "Local Device Monitor — all 8 up");
+        assert_eq!(tooltip_text(6, 2, 0), "Local Device Monitor — 2 down, 6 up");
         assert_eq!(
             tooltip_text(6, 2, 1),
-            "Local Monitor — 2 down, 6 up (1 paused)"
+            "Local Device Monitor — 2 down, 6 up (1 paused)"
         );
         // A paused device is not a healthy one, so it is worth saying even when
         // nothing is down.
-        assert_eq!(tooltip_text(7, 0, 1), "Local Monitor — all 7 up (1 paused)");
+        assert_eq!(
+            tooltip_text(7, 0, 1),
+            "Local Device Monitor — all 7 up (1 paused)"
+        );
     }
 
     #[test]

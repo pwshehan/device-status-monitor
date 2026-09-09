@@ -9,7 +9,7 @@ import (
 	// production reads the machine's own timezone, which is the point.
 	_ "time/tzdata"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/model"
 )
 
 // TestDowntimeAcrossDaylightSaving covers the risk §14 names: a clock change

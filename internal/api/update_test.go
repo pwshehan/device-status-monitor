@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/store"
-	"github.com/pwshehan/device-status-monitor/internal/update"
+	"github.com/pwshehan/local-device-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/update"
 )
 
 func TestUpdateNeedsAToken(t *testing.T) {

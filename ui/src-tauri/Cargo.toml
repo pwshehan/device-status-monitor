@@ -1,17 +1,17 @@
 [package]
-name = "local-monitor-gui"
+name = "local-device-monitor-gui"
 version = "0.1.0"
-description = "Local Monitor desktop shell"
-authors = ["Shein.Engineer"]
+description = "Local Device Monitor desktop shell"
+authors = ["Shehan Wijethunga"]
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/pwshehan/device-status-monitor"
+repository = "https://github.com/pwshehan/local-device-monitor"
 rust-version = "1.77"
 
 # The library is what the mobile targets would link; keeping main.rs a
 # three-line shim over it is the shape Tauri v2 expects.
 [lib]
-name = "local_monitor_gui_lib"
+name = "local_device_monitor_gui_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

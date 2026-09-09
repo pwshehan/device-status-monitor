@@ -1,8 +1,8 @@
 # Local Device Monitor
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/pwshehan/device-status-monitor)](https://github.com/pwshehan/device-status-monitor/releases/latest)
-[![CI](https://github.com/pwshehan/device-status-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/pwshehan/device-status-monitor/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/pwshehan/local-device-monitor)](https://github.com/pwshehan/local-device-monitor/releases/latest)
+[![CI](https://github.com/pwshehan/local-device-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/pwshehan/local-device-monitor/actions/workflows/ci.yml)
 
 Watches TCP endpoints on your network and emails you when one stops answering.
 
@@ -30,7 +30,7 @@ reasoning behind it.
 ## Installing
 
 Download `LocalMonitor-Setup-<version>.exe` from the
-[releases page](https://github.com/pwshehan/device-status-monitor/releases) and
+[releases page](https://github.com/pwshehan/local-device-monitor/releases) and
 run it as an administrator.
 
 Builds are **unsigned**, so SmartScreen will say *"Windows protected your
@@ -396,7 +396,7 @@ installer               Inno Setup script and the acceptance checklist
 ## Status
 
 **1.0.0 is released** — see the
-[releases page](https://github.com/pwshehan/device-status-monitor/releases).
+[releases page](https://github.com/pwshehan/local-device-monitor/releases).
 Phases 0–5 are done: the engine, the dashboard, the service and the installer.
 
 Two things are honest to know about that release. Its

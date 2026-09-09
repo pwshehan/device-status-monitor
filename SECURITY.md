@@ -15,7 +15,7 @@ branches.
 **Please do not open a public issue for a security problem.**
 
 Use GitHub's private vulnerability reporting: go to the
-[Security tab](https://github.com/pwshehan/device-status-monitor/security)
+[Security tab](https://github.com/pwshehan/local-device-monitor/security)
 and choose **Report a vulnerability**. That opens a private advisory visible
 only to the maintainer.
 
