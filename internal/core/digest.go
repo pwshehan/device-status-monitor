@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
-	"github.com/pwshehan/device-status-monitor/internal/notify"
-	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/notify"
+	"github.com/pwshehan/local-device-monitor/internal/store"
 )
 
 // Collapse rules. The window is a setting; these two are not, because they

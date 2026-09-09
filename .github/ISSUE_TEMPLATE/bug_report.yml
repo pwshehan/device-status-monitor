@@ -6,10 +6,10 @@ body:
     attributes:
       value: |
         Before filing: if this is a **security** problem, please use the
-        [Security tab](https://github.com/pwshehan/device-status-monitor/security)
+        [Security tab](https://github.com/pwshehan/local-device-monitor/security)
         instead so it stays private.
 
-        [docs/TROUBLESHOOTING.md](https://github.com/pwshehan/device-status-monitor/blob/main/docs/TROUBLESHOOTING.md)
+        [docs/TROUBLESHOOTING.md](https://github.com/pwshehan/local-device-monitor/blob/main/docs/TROUBLESHOOTING.md)
         covers the failures this system actually has, and will often tell you
         what is wrong faster than an issue will.
   - type: input

@@ -5,10 +5,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/api"
-	"github.com/pwshehan/device-status-monitor/internal/model"
-	"github.com/pwshehan/device-status-monitor/internal/probe"
-	"github.com/pwshehan/device-status-monitor/internal/state"
+	"github.com/pwshehan/local-device-monitor/internal/api"
+	"github.com/pwshehan/local-device-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/probe"
+	"github.com/pwshehan/local-device-monitor/internal/state"
 )
 
 // App satisfies api.Engine. The methods are gathered here rather than spread

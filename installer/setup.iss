@@ -17,7 +17,14 @@
 
 #define AppName        "Local Device Monitor"
 #define AppShortName   "LocalMonitor"
-#define Publisher      "Shein.Engineer"
+#define Publisher      "Shehan Wijethunga"
+
+; Deliberately not the publisher name. This is where KeepDataOnUninstall is
+; recorded, and an upgraded copy has to find the flag its predecessor wrote:
+; renaming the key would orphan it and leave the uninstaller unable to tell
+; whether the history was meant to be kept. It is an identifier, not a label,
+; so it stays as it was first shipped.
+#define RegCompany     "Shein.Engineer"
 #define ServiceExe     "monitor-service.exe"
 #define GuiExe         "monitor-gui.exe"
 #define ServiceName    "LocalMonitorSvc"
@@ -171,7 +178,7 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
-    RegWriteDWordValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\{#Publisher}\{#AppShortName}',
+    RegWriteDWordValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\{#RegCompany}\{#AppShortName}',
       'KeepDataOnUninstall', Integer(KeepDataPage.SelectedValueIndex = 0));
 end;
 
@@ -188,7 +195,7 @@ begin
   // Default to keeping: if the registry value is missing for any reason, the
   // safe reading of an ambiguous instruction is not to delete a year of
   // history.
-  if not RegQueryDWordValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\{#Publisher}\{#AppShortName}',
+  if not RegQueryDWordValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\{#RegCompany}\{#AppShortName}',
       'KeepDataOnUninstall', Keep) then
     Keep := 1;
 
@@ -204,5 +211,5 @@ begin
     MsgBox('The monitoring history has been left in:' + #13#10 + DataDir + #13#10#13#10 +
       'Delete that folder by hand if you no longer need it.', mbInformation, MB_OK);
 
-  RegDeleteKeyIncludingSubkeys(HKEY_LOCAL_MACHINE, 'SOFTWARE\{#Publisher}\{#AppShortName}');
+  RegDeleteKeyIncludingSubkeys(HKEY_LOCAL_MACHINE, 'SOFTWARE\{#RegCompany}\{#AppShortName}');
 end;

@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/appdir"
-	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/appdir"
+	"github.com/pwshehan/local-device-monitor/internal/store"
 )
 
 // installerBody stands in for the real setup exe. Its contents do not matter;

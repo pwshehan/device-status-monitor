@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/api"
-	"github.com/pwshehan/device-status-monitor/internal/appdir"
-	"github.com/pwshehan/device-status-monitor/internal/core"
-	"github.com/pwshehan/device-status-monitor/internal/logx"
-	"github.com/pwshehan/device-status-monitor/internal/store"
-	"github.com/pwshehan/device-status-monitor/internal/svcrun"
+	"github.com/pwshehan/local-device-monitor/internal/api"
+	"github.com/pwshehan/local-device-monitor/internal/appdir"
+	"github.com/pwshehan/local-device-monitor/internal/core"
+	"github.com/pwshehan/local-device-monitor/internal/logx"
+	"github.com/pwshehan/local-device-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/svcrun"
 )
 
 // version is stamped at build time: -ldflags "-X main.version=1.0.0".

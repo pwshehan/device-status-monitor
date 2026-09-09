@@ -107,7 +107,7 @@ jobs:
         run: |
           # The Cargo crate name is what names the binary; the installer, the
           # Start Menu entry and the service's sibling are all "monitor-gui".
-          Copy-Item ui/src-tauri/target/release/local-monitor-gui.exe dist/monitor-gui.exe
+          Copy-Item ui/src-tauri/target/release/local-device-monitor-gui.exe dist/monitor-gui.exe
 
       # WebView2 is on every Windows 11 and every updated Windows 10, so this
       # is only a fallback. Bundled rather than downloaded at install time

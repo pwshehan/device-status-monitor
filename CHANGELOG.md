@@ -7,6 +7,34 @@ Leaving this heading as `Unreleased` is what keeps an accidental
 section of its own here. Retitling it to the version being shipped is a
 deliberate step taken at release time.
 
+### Naming
+
+- **One name everywhere: "Local Device Monitor."** The repository and Go module
+  are now `local-device-monitor`; the desktop shell, its window title, tray
+  tooltip and browser tab all say "Local Device Monitor" rather than "Local
+  Monitor"; and `Shein.Engineer` is replaced by the author's own name in the
+  publisher, copyright and author fields.
+- **Three identifiers deliberately did not move**, because they are identifiers
+  rather than labels and 1.0.0 has already shipped with them:
+  - `LocalMonitor-Setup-<version>.exe`. The updater in every installed 1.0.0
+    looks the installer up by *exact* asset name, so renaming it would leave
+    those copies able to see a new release and unable to fetch it.
+  - `LocalMonitorSvc`, `C:\ProgramData\LocalMonitor` and
+    `C:\Program Files\LocalMonitor`. Renaming these would orphan the history
+    of every existing install and leave a stale service behind on upgrade.
+  - The desktop shell's Tauri identifier, `engineer.shein.localmonitor`, which
+    keys the WebView2 profile and the "start with Windows" registration. It
+    cannot carry a comment explaining itself, being strict JSON, which is why
+    it is written down here.
+- The installer's `Publisher` define, which was doing double duty as both the
+  displayed publisher and the registry key path holding `KeepDataOnUninstall`,
+  is split in two. The display name follows the rename; the key path stays as
+  first shipped, so an upgraded copy can still find the flag its predecessor
+  wrote.
+- Renaming the repository leaves GitHub redirecting the old path, which is what
+  keeps 1.0.0's update checks working. The old name must therefore never be
+  reused for anything else.
+
 ### Project
 
 - **Licensed under Apache-2.0.** The repository previously carried no licence

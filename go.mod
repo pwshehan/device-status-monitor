@@ -1,4 +1,4 @@
-module github.com/pwshehan/device-status-monitor
+module github.com/pwshehan/local-device-monitor
 
 go 1.25.0
 

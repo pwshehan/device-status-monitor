@@ -1,5 +1,5 @@
 {
-  "name": "local-monitor-ui",
+  "name": "local-device-monitor-ui",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pwshehan/device-status-monitor.git"
+    "url": "git+https://github.com/pwshehan/local-device-monitor.git"
   },
   "engines": {
     "node": ">=24.15.0"

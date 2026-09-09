@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
-	"github.com/pwshehan/device-status-monitor/internal/state"
+	"github.com/pwshehan/local-device-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/state"
 )
 
 const deviceCols = `id, name, ip_address, port, group_id,

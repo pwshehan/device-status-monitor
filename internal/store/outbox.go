@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/model"
 )
 
 // Enqueue adds a mail to the durable outbox, due immediately.

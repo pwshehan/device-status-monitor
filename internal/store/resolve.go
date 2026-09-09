@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/model"
 )
 
 // Resolver holds the two lower tiers of the effective-value chain — the global

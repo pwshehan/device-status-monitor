@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/api"
-	"github.com/pwshehan/device-status-monitor/internal/appdir"
-	"github.com/pwshehan/device-status-monitor/internal/model"
-	"github.com/pwshehan/device-status-monitor/internal/notify"
-	"github.com/pwshehan/device-status-monitor/internal/probe"
-	"github.com/pwshehan/device-status-monitor/internal/store"
+	"github.com/pwshehan/local-device-monitor/internal/api"
+	"github.com/pwshehan/local-device-monitor/internal/appdir"
+	"github.com/pwshehan/local-device-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/notify"
+	"github.com/pwshehan/local-device-monitor/internal/probe"
+	"github.com/pwshehan/local-device-monitor/internal/store"
 )
 
 // quietLog keeps test output readable; raise the level when debugging a failure.

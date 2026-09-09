@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/pwshehan/device-status-monitor/internal/model"
+	"github.com/pwshehan/local-device-monitor/internal/model"
 )
 
 const incidentCols = `id, device_id, started_at, detected_at, resolved_at,
