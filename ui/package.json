@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Local Device Monitor \u2014 dashboard for the loopback API on 127.0.0.1:39215",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pwshehan/device-status-monitor.git"
+  },
   "engines": {
     "node": ">=24.15.0"
   },

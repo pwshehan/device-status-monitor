@@ -1,5 +1,9 @@
 # Local Device Monitor
 
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/pwshehan/device-status-monitor)](https://github.com/pwshehan/device-status-monitor/releases/latest)
+[![CI](https://github.com/pwshehan/device-status-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/pwshehan/device-status-monitor/actions/workflows/ci.yml)
+
 Watches TCP endpoints on your network and emails you when one stops answering.
 
 A Windows service does the probing, alerting and record-keeping; a desktop
@@ -29,10 +33,13 @@ Download `LocalMonitor-Setup-<version>.exe` from the
 [releases page](https://github.com/pwshehan/device-status-monitor/releases) and
 run it as an administrator.
 
-Builds are **unsigned** — this is an internal tool, so SmartScreen will say
-*"Windows protected your PC"*. Choose **More info → Run anyway**, and check the
-download against the `SHA256SUMS` attached to the release if you want to be
-certain of what you got.
+Builds are **unsigned**, so SmartScreen will say *"Windows protected your
+PC"*. Choose **More info → Run anyway**, and check the download against the
+`SHA256SUMS` attached to the release if you want to be certain of what you
+got. Signing needs a certificate this project does not have; the reasoning,
+and what would change if that stopped being true, is in PLAN.md §11. If you
+would rather not run an unsigned binary at all,
+[build it from source](#building-from-source) — the same installer comes out.
 
 The installer:
 
@@ -388,6 +395,40 @@ installer               Inno Setup script and the acceptance checklist
 
 ## Status
 
-Phases 0–4 are done and tested. Phase 5 (service and installer) is built and
-compiling; its install-and-reboot acceptance run is outstanding — see
-[installer/ACCEPTANCE.md](installer/ACCEPTANCE.md) and PLAN.md §16.
+**1.0.0 is released** — see the
+[releases page](https://github.com/pwshehan/device-status-monitor/releases).
+Phases 0–5 are done: the engine, the dashboard, the service and the installer.
+
+Two things are honest to know about that release. Its
+[acceptance run](installer/ACCEPTANCE.md) was carried out on a working Windows
+machine rather than a clean VM, so the reboot section was not tested under
+controlled conditions, and the email path was exercised only as far as the
+outbox — SMTP was not configured. Both are covered by the checklist for anyone
+who wants to run it properly.
+
+## Contributing
+
+Forks and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers
+the toolchain, what CI checks, and the one thing that matters most here: the
+Go tests run on Linux in CI while the product is a Windows service, so changes
+touching sockets, credentials or the filesystem need running on Windows before
+you open the PR.
+
+Security problems should go through
+[SECURITY.md](SECURITY.md) rather than a public issue. That file also lists
+the limitations that are deliberate, so you can tell whether what you found is
+a bug or a documented trade-off.
+
+By participating you agree to the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Licence
+
+[Apache License 2.0](LICENSE) — Copyright 2026 Shehan Wijethunga.
+
+You may use, modify, distribute and sell this software, including as part of a
+proprietary product, provided you preserve the copyright and licence notices,
+state what you changed, and do not use the project's name or the author's to
+endorse your version. The licence also grants a patent licence from every
+contributor. See [NOTICE](NOTICE) for third-party components, which carry
+their own permissive licences.

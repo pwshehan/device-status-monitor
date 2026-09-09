@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+Leaving this heading as `Unreleased` is what keeps an accidental
+`git push --tags` from producing a release: the workflow refuses a tag with no
+section of its own here. Retitling it to the version being shipped is a
+deliberate step taken at release time.
+
+### Project
+
+- **Licensed under Apache-2.0.** The repository previously carried no licence
+  at all, which meant nobody could legally fork it. Apache-2.0 rather than MIT
+  for the explicit patent grant and the trademark clause. See
+  [LICENSE](LICENSE) and [NOTICE](NOTICE).
+- Contribution and security policy: [CONTRIBUTING.md](CONTRIBUTING.md),
+  [SECURITY.md](SECURITY.md) and a
+  [code of conduct](CODE_OF_CONDUCT.md). `SECURITY.md` spells out which
+  limitations are deliberate — the readable `api.token`, the unsigned build,
+  loopback not being the security model — so a reporter can tell a bug from a
+  documented trade-off.
+- Issue and pull-request templates. The PR template asks which OS the change
+  was tested on, because the Go suite runs on Linux in CI while the product is
+  a Windows service.
+- Dependabot across all four ecosystems the project spans — Go, npm, Cargo and
+  Actions — grouped and monthly, because a release with a manual acceptance run
+  cannot absorb a stream of individual bumps.
+- `license` and `repository` metadata added to `ui/package.json` and
+  `ui/src-tauri/Cargo.toml`, which both previously declared no licence.
+
 ## 1.0.0
 
 First release. A Windows service that watches devices over TCP, records the

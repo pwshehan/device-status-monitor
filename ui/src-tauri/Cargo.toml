@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Local Monitor desktop shell"
 authors = ["Shein.Engineer"]
 edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/pwshehan/device-status-monitor"
 rust-version = "1.77"
 
 # The library is what the mobile targets would link; keeping main.rs a

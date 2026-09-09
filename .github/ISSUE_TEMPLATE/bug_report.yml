@@ -1,0 +1,59 @@
+name: Bug report
+description: Something does not work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: if this is a **security** problem, please use the
+        [Security tab](https://github.com/pwshehan/device-status-monitor/security)
+        instead so it stays private.
+
+        [docs/TROUBLESHOOTING.md](https://github.com/pwshehan/device-status-monitor/blob/main/docs/TROUBLESHOOTING.md)
+        covers the failures this system actually has, and will often tell you
+        what is wrong faster than an issue will.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `monitor-service.exe version`
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: "`winver`, or Settings → System → About"
+      placeholder: "Windows 11 Pro 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: |
+        From `C:\ProgramData\LocalMonitor\logs\monitor.log`, or — if the service
+        would not start — Event Viewer → Windows Logs → Application, source
+        `LocalMonitorSvc`. Please redact addresses and recipients you would
+        rather not publish.
+      render: text
+  - type: dropdown
+    id: service
+    attributes:
+      label: Is the service running?
+      description: "`sc.exe query LocalMonitorSvc`"
+      options:
+        - "Yes — RUNNING"
+        - "No — stopped or will not start"
+        - "It does not exist"
+        - "Not sure"
+    validations:
+      required: true
