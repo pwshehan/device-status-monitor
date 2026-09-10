@@ -19,9 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Taken from go.mod rather than pinned here. A hardcoded '1.25' drifted
+      # the moment a dependency bump raised the directive to 1.26.0, and
+      # setup-go v7 exports GOTOOLCHAIN=local, so the build stopped rather
+      # than fetching the newer toolchain the way v5 had been doing unasked.
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
+          go-version-file: go.mod
           cache: true
 
       - name: Format check

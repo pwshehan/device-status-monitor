@@ -68,9 +68,11 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "building $version"
 
+      # From go.mod, for the reason recorded in ci.yml. It matters more here:
+      # this job builds what ships.
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
+          go-version-file: go.mod
           cache: true
 
       - uses: actions/setup-node@v7
