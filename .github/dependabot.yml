@@ -18,6 +18,13 @@ updates:
     groups:
       ui-dependencies:
         patterns: ["*"]
+    # typescript-eslint's peer range still caps TypeScript below 6.1, so a
+    # major TS bump cannot resolve: npm ci fails, taking every other bump
+    # grouped with it down too. Drop this once the linter declares support
+    # for the next major.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: cargo
     directory: /ui/src-tauri
